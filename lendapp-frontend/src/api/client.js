@@ -1,58 +1,83 @@
-const API_URL = "http://192.168.1.127:8100";
+const BASE = process.env.REACT_APP_API_URL || "http://192.168.1.127:8100";
 
-// ─────────────────────────────
-// REGISTER
-// ─────────────────────────────
-export async function register(form) {
-  const res = await fetch(`${API_URL}/users/register`, {
-    method: "POST",
+async function req(method, path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(form)
+    body: body ? JSON.stringify(body) : undefined
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail || "Registrierung fehlgeschlagen");
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Fehler");
   }
 
+  if (res.status === 204) return null;
   return res.json();
 }
 
-// ─────────────────────────────
-// LOGIN
-// ─────────────────────────────
-export async function login(email, password) {
-  const res = await fetch(`${API_URL}/users/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      email,
-      password
-    })
+// ─────────────────────
+// AUTH
+// ─────────────────────
+export const register = (data) =>
+  req("POST", "/users/register", data);
+
+export const login = (email, password) =>
+  req("POST", "/users/login", {
+    email,
+    password
   });
 
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail || "Login fehlgeschlagen");
-  }
+// ─────────────────────
+// GROUPS
+// ─────────────────────
+export const createGroup = (data) =>
+  req("POST", "/groups/", data);
 
-  return res.json();
-}
+export const getGroup = (id) =>
+  req("GET", `/groups/${id}`);
 
-// ─────────────────────────────
-// GET USER
-// ─────────────────────────────
-export async function getUser(userId) {
-  const res = await fetch(`${API_URL}/users/${userId}`);
+export const joinGroup = (id, invite_code) =>
+  req("POST", `/groups/${id}/join`, {
+    invite_code
+  });
 
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail || "User nicht gefunden");
-  }
+export const getMembers = (id) =>
+  req("GET", `/groups/${id}/members`);
 
-  return res.json();
-}
+// ─────────────────────
+// ITEMS
+// ─────────────────────
+export const createItem = (data) =>
+  req("POST", "/items/", data);
+
+export const getItems = (groupId) =>
+  req("GET", `/items/group/${groupId}`);
+
+export const getItem = (id) =>
+  req("GET", `/items/${id}`);
+
+export const updateItem = (id, data) =>
+  req("PATCH", `/items/${id}`, data);
+
+export const deleteItem = (id) =>
+  req("DELETE", `/items/${id}`);
+
+// ─────────────────────
+// BOOKINGS
+// ─────────────────────
+export const requestBooking = (data) =>
+  req("POST", "/bookings/", data);
+
+export const getBookingsForItem = (itemId) =>
+  req("GET", `/bookings/item/${itemId}`);
+
+export const getBookingsForUser = (uid) =>
+  req("GET", `/bookings/user/${uid}`);
+
+export const updateBookingStatus = (id, status) =>
+  req("PATCH", `/bookings/${id}/status`, {
+    status
+  });
