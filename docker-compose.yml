@@ -17,7 +17,7 @@ services:
   frontend:
     build: ./lendapp-frontend
     ports:
-      - "3000:80"
+      - "3100:80"
     depends_on:
       api:
         condition: service_healthy
