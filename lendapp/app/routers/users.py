@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.models import User
@@ -9,26 +10,31 @@ from app.auth import hash_password, verify_password
 router = APIRouter()
 
 # ─────────────────────────────
+# LOGIN SCHEMA
+# ─────────────────────────────
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# ─────────────────────────────
 # REGISTER
 # ─────────────────────────────
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(data: UserCreate, db: Session = Depends(get_db)):
 
-    # 🔍 DEBUG (nur temporär lassen)
     print("RAW DATA:", data)
     print("TYPE:", type(data.password))
     print("VALUE:", data.password)
     print("LENGTH:", len(str(data.password)))
 
-    # ❌ Check: Email existiert schon?
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=400, detail="E-Mail bereits registriert")
 
-    # 🔐 User erstellen
     user = User(
         name=data.name,
         email=data.email,
-        password=hash_password(str(data.password)[:72])  # bcrypt safety
+        password=hash_password(str(data.password))  # bcrypt fix (kein [:72] nötig mehr)
     )
 
     db.add(user)
@@ -39,14 +45,14 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 
 # ─────────────────────────────
-# LOGIN
+# LOGIN (FIXED)
 # ─────────────────────────────
 @router.post("/login")
-def login(email: str, password: str, db: Session = Depends(get_db)):
+def login(data: LoginRequest, db: Session = Depends(get_db)):
 
-    user = db.query(User).filter(User.email == email).first()
+    user = db.query(User).filter(User.email == data.email).first()
 
-    if not user or not verify_password(password, user.password):
+    if not user or not verify_password(data.password, user.password):
         raise HTTPException(status_code=401, detail="Ungültige Anmeldedaten")
 
     return {
