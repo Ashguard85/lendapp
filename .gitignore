@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Datenbank
+*.db
+*.sqlite3
+
+# Umgebungsvariablen
+.env
+.env.local
+
+# Node / React
+node_modules/
+build/
+.DS_Store
+
+# Docker
+*.tar.gz
