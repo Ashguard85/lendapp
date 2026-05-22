@@ -2,7 +2,7 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "8100:8000"
     volumes:
       - sqlite_data:/data          # persistent DB
       - ./lendapp.db:/app/lendapp.db  # local dev convenience
@@ -10,7 +10,7 @@ services:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8100/"]
       interval: 30s
       timeout: 10s
       retries: 3
