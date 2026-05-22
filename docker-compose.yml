@@ -2,7 +2,7 @@ services:
   api:
     build: ./lendapp
     ports:
-      - "8000:8000"
+      - "8100:8000"
     volumes:
       - sqlite_data:/app
     environment:
