@@ -1,10 +1,11 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
-ENV REACT_APP_API_URL=http://localhost:8000
+ENV REACT_APP_API_URL=http://localhost:8100
+ENV NODE_OPTIONS=--max-old-space-size=1024
 RUN npm run build
 
 # Stage 2: Serve with nginx
