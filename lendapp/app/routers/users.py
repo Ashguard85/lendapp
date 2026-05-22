@@ -1,6 +1,10 @@
-print("RAW DATA:", data)
-print("DICT:", data.dict())
-print("PASSWORD:", data.password)
+@router.post("/register")
+def register(data: UserCreate):
+    print("RAW DATA:", data)
+    print("DICT:", data.dict())
+    print("PASSWORD:", data.password)
+
+    # restlicher Code...
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
