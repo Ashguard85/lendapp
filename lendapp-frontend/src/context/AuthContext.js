@@ -6,7 +6,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("lendapp_user")); } catch { return null; }
   });
-  const [groupId, setGroupId] = useState(() => localStorage.getItem("lendapp_group"));
+  const [groupId, setGroupId] = useState(() => {
+    const val = localStorage.getItem("lendapp_group");
+    return val ? parseInt(val, 10) : null;
+  });
 
   function login(userData) {
     localStorage.setItem("lendapp_user", JSON.stringify(userData));
@@ -19,8 +22,9 @@ export function AuthProvider({ children }) {
     setGroupId(null);
   }
   function setGroup(id) {
-    localStorage.setItem("lendapp_group", id);
-    setGroupId(id);
+    const numId = parseInt(id, 10);
+    localStorage.setItem("lendapp_group", String(numId));
+    setGroupId(numId);
   }
 
   return (
