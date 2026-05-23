@@ -1,7 +1,9 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function BottomNav() {
   const { pathname } = useLocation();
+  const { logout } = useAuth();
   const navigate = useNavigate();
 
   const links = [
@@ -23,6 +25,10 @@ export default function BottomNav() {
           <span className="bottom-nav-label">{l.label}</span>
         </div>
       ))}
+      <div className="bottom-nav-item" onClick={logout}>
+        <span className="bottom-nav-icon">↩</span>
+        <span className="bottom-nav-label">Logout</span>
+      </div>
     </nav>
   );
 }
