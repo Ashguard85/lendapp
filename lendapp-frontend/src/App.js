@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./components/Toast";
 import Sidebar from "./components/Sidebar";
+import BottomNav from "./components/BottomNav";
 import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import ItemsPage, { ItemDetailPage } from "./pages/ItemsPage";
@@ -24,6 +25,7 @@ function AppShell() {
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
+      <BottomNav />
     </div>
   );
 }
