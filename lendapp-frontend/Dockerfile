@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --legacy-peer-deps
 COPY . .
-ENV REACT_APP_API_URL=http://192.168.1.127:8100
+ENV REACT_APP_API_URL=http://localhost:8100
 ENV NODE_OPTIONS=--max-old-space-size=1024
 RUN npm run build
 
