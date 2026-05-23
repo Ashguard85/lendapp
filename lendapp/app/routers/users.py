@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from app.database import get_db
-from app.models.models import User
+from app.models.models import User, GroupMember
 from app.schemas.schemas import UserCreate, UserOut
 from app.auth import hash_password, verify_password
 
@@ -34,7 +34,19 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(401, "Ungültige Anmeldedaten")
-    return {"user_id": user.id, "name": user.name, "message": "Login erfolgreich"}
+    
+    # Erste Gruppe des Users mitliefern
+    membership = db.query(GroupMember).filter(
+        GroupMember.user_id == user.id
+    ).first()
+    group_id = membership.group_id if membership else None
+
+    return {
+        "user_id": user.id,
+        "name": user.name,
+        "group_id": group_id,
+        "message": "Login erfolgreich"
+    }
 
 
 @router.get("/{user_id}", response_model=UserOut)
