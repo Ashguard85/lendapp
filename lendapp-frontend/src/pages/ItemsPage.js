@@ -7,7 +7,7 @@ import * as api from "../api/client";
 const CATEGORIES = ["Werkzeug", "Sport", "Haushalt", "Elektronik", "Sonstiges"];
 
 function AddItemModal({ onClose, onSaved, groupId, userId }) {
-  const [form, setForm] = useState({ name: "", description: "", category: "Werkzeug", max_days: 14, group_id: Number(groupId) });
+  const [form, setForm] = useState({ name: "", description: "", category: "Werkzeug", max_days: 14, group_id: parseInt(groupId,10) });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
