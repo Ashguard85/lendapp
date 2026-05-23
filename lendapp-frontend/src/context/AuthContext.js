@@ -8,7 +8,9 @@ export function AuthProvider({ children }) {
   });
   const [groupId, setGroupId] = useState(() => {
     const val = localStorage.getItem("lendapp_group");
-    return val ? parseInt(val, 10) : null;
+    if (!val) return null;
+    const num = parseInt(val, 10);
+    return isNaN(num) ? null : num;
   });
 
   function login(userData) {
@@ -22,7 +24,8 @@ export function AuthProvider({ children }) {
     setGroupId(null);
   }
   function setGroup(id) {
-    const numId = parseInt(id, 10);
+    const numId = parseInt(String(id), 10);
+    if (isNaN(numId)) return;
     localStorage.setItem("lendapp_group", String(numId));
     setGroupId(numId);
   }
