@@ -1,3 +1,7 @@
+useEffect(() => {
+  if (!groupId) return setLoading(false);
+  api.getItems(groupId, user.user_id).then(setItems).finally(() => setLoading(false));
+}, [groupId, user.user_id]);
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
