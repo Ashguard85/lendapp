@@ -1,3 +1,11 @@
+useEffect(() => {
+  if (!groupId) return setLoading(false);
+  Promise.all([
+    api.getItems(groupId, user.user_id),
+    api.getBookingsForUser(user.user_id),
+  ]).then(([its, bks]) => { setItems(its); setBookings(bks); })
+    .finally(() => setLoading(false));
+}, [groupId, user.user_id]);
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
