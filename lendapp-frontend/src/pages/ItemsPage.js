@@ -6,6 +6,23 @@ import * as api from "../api/client";
 
 const CATEGORIES = ["Werkzeug", "Sport", "Haushalt", "Elektronik", "Sonstiges"];
 
+function fmt(date) {
+  return new Date(date).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+const STATUS_LABEL = {
+  pending:  "⏳ ausstehend",
+  approved: "✓ genehmigt",
+  rejected: "✕ abgelehnt",
+  returned: "↩ zurückgegeben",
+};
+const STATUS_BADGE = {
+  pending:  "badge-orange",
+  approved: "badge-green",
+  rejected: "badge-gray",
+  returned: "badge-blue",
+};
+
 function AddItemModal({ onClose, onSaved, groupId, userId }) {
   const [form, setForm] = useState({
     name: "", description: "", category: "Werkzeug",
@@ -26,7 +43,7 @@ function AddItemModal({ onClose, onSaved, groupId, userId }) {
       const url = await api.uploadImage(file);
       setImageUrl(url);
       setImagePreview(URL.createObjectURL(file));
-    } catch (e) { setError("Bild-Upload fehlgeschlagen"); }
+    } catch { setError("Bild-Upload fehlgeschlagen"); }
     finally { setUploading(false); }
   }
 
@@ -34,10 +51,7 @@ function AddItemModal({ onClose, onSaved, groupId, userId }) {
     if (!form.name.trim()) return setError("Name ist Pflicht");
     setLoading(true);
     try {
-      await api.createItem(
-        { ...form, max_days: Number(form.max_days), image_url: imageUrl },
-        userId
-      );
+      await api.createItem({ ...form, max_days: Number(form.max_days), image_url: imageUrl }, userId);
       onSaved();
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -158,19 +172,20 @@ export function ItemDetailPage() {
   const [bookings, setBookings] = useState([]);
   const [showBook, setShowBook] = useState(false);
 
-  useEffect(() => {
+  function load() {
     api.getItem(id).then(setItem);
     api.getBookingsForItem(id).then(setBookings);
-  }, [id]);
+  }
+  useEffect(load, [id]);
 
   if (!item) return <div style={{ padding: 32, color: "var(--text3)" }}>Lädt…</div>;
 
   const isOwner = item.owner_id === user.user_id;
+  const activeBooking = bookings.find(b => b.status === "approved");
 
   async function handleStatusChange(bookingId, status) {
     await api.updateBookingStatus(bookingId, status, user.user_id);
-    api.getBookingsForItem(id).then(setBookings);
-    api.getItem(id).then(setItem);
+    load();
   }
 
   return (
@@ -180,7 +195,8 @@ export function ItemDetailPage() {
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card" style={{ marginBottom: 16 }}>
             {item.image_url ? (
-              <img src={item.image_url} alt={item.name} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
+              <img src={item.image_url} alt={item.name}
+                style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
             ) : (
               <div style={{ fontSize: 48, width: "100%", height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg2)", borderRadius: 10, marginBottom: 14 }}>
                 {CATEGORY_EMOJI[item.category] || "📦"}
@@ -191,36 +207,39 @@ export function ItemDetailPage() {
             <span className={`badge ${item.is_available ? "badge-green" : "badge-orange"}`}>
               {item.is_available ? "✓ verfügbar" : "ausgeliehen"}
             </span>
+            {!item.is_available && activeBooking && (
+              <div style={{ marginTop: 8, fontSize: 13, color: "var(--text2)" }}>
+                📤 Bei <strong>{activeBooking.borrower_name}</strong> · frei ab <strong>{fmt(activeBooking.date_to)}</strong>
+              </div>
+            )}
             {item.description && (
               <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>{item.description}</p>
             )}
             <div className="divider" />
             <div style={{ display: "flex", gap: 20, fontSize: 13, color: "var(--text2)" }}>
               <span>Max. <strong>{item.max_days}</strong> Tage</span>
-              <span>Besitzer ID: <strong>{item.owner_id}</strong></span>
             </div>
           </div>
           {!isOwner && item.is_available && (
             <button className="btn btn-primary btn-full" onClick={() => setShowBook(true)}>📅 Jetzt anfragen</button>
           )}
         </div>
+
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 14 }}>Buchungshistorie</div>
             {bookings.length === 0 && <div style={{ color: "var(--text3)", fontSize: 13 }}>Noch keine Buchungen.</div>}
             {bookings.map(b => (
               <div key={b.id} className="booking-row">
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>User #{b.borrower_id}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{b.borrower_name}</div>
                   <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                    {new Date(b.date_from).toLocaleDateString("de-CH")} – {new Date(b.date_to).toLocaleDateString("de-CH")}
+                    {fmt(b.date_from)} – {fmt(b.date_to)}
                   </div>
-                  {b.note && <div style={{ fontSize: 12, color: "var(--text2)", fontStyle: "italic" }}>{b.note}</div>}
+                  {b.note && <div style={{ fontSize: 12, color: "var(--text2)", fontStyle: "italic" }}>„{b.note}"</div>}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                  <span className={`badge ${b.status === "approved" ? "badge-green" : b.status === "pending" ? "badge-orange" : b.status === "returned" ? "badge-blue" : "badge-gray"}`}>
-                    {b.status}
-                  </span>
+                  <span className={`badge ${STATUS_BADGE[b.status]}`}>{STATUS_LABEL[b.status]}</span>
                   {isOwner && b.status === "pending" && (
                     <div style={{ display: "flex", gap: 4 }}>
                       <button className="btn btn-sm" style={{ background: "var(--accent-light)", color: "var(--accent)", padding: "3px 8px", fontSize: 11 }}
@@ -242,7 +261,7 @@ export function ItemDetailPage() {
       {showBook && (
         <BookingModal item={item} userId={user.user_id}
           onClose={() => setShowBook(false)}
-          onBooked={() => { setShowBook(false); api.getBookingsForItem(id).then(setBookings); }} />
+          onBooked={() => { setShowBook(false); load(); }} />
       )}
     </div>
   );

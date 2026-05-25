@@ -8,14 +8,9 @@ export function AuthProvider({ children }) {
   });
   const [groupId, setGroupId] = useState(() => {
     const val = localStorage.getItem("lendapp_group");
-    if (val) {
-      const num = parseInt(val, 10);
-      return isNaN(num) ? null : num;
-    }
-    try {
-      const u = JSON.parse(localStorage.getItem("lendapp_user"));
-      return u?.group_id || null;
-    } catch { return null; }
+    if (!val) return null;
+    const num = parseInt(val, 10);
+    return isNaN(num) ? null : num;
   });
 
   function login(userData) {

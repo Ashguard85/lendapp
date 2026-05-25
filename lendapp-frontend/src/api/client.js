@@ -11,7 +11,6 @@ async function req(method, path, body, userId) {
     method,
     headers: headers(userId),
   };
-  // GET und DELETE haben keinen Body
   if (body !== undefined && method !== "GET" && method !== "DELETE") {
     options.body = JSON.stringify(body);
   }
@@ -46,6 +45,7 @@ export const deleteItem = (id, uid) => req("DELETE", `/items/${id}?user_id=${uid
 export const requestBooking = (data, uid) => req("POST", `/bookings/?user_id=${uid}`, data, uid);
 export const getBookingsForItem = (itemId) => req("GET", `/bookings/item/${itemId}`);
 export const getBookingsForUser = (uid) => req("GET", `/bookings/user/${uid}`, undefined, uid);
+export const getPendingForOwner = (uid) => req("GET", `/bookings/pending/owner/${uid}`, undefined, uid);
 export const updateBookingStatus = (id, status, uid) =>
   req("PATCH", `/bookings/${id}/status?user_id=${uid}`, { status }, uid);
 
