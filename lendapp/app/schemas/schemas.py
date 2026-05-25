@@ -14,6 +14,8 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: str
+    is_admin: bool
+    is_active: bool
     created_at: datetime
     class Config: from_attributes = True
 

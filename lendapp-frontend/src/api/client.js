@@ -44,3 +44,32 @@ export const getBookingsForItem = (itemId) => req("GET", `/bookings/item/${itemI
 export const getBookingsForUser = (uid) => req("GET", `/bookings/user/${uid}`);
 export const updateBookingStatus = (id, status, uid) =>
   req("PATCH", `/bookings/${id}/status?user_id=${uid}`, { status }, uid);
+
+// Upload
+export async function uploadImage(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${BASE}/upload/`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Upload fehlgeschlagen");
+  const data = await res.json();
+  return data.url;
+}
+
+// Admin
+export const adminStats        = (uid) => req("GET", `/admin/stats?admin_id=${uid}`);
+export const adminListUsers    = (uid) => req("GET", `/admin/users?admin_id=${uid}`);
+export const adminCreateUser   = (data, uid) => req("POST", `/admin/users?admin_id=${uid}`, data);
+export const adminUpdateUser   = (id, data, uid) => req("PATCH", `/admin/users/${id}?admin_id=${uid}`, data);
+export const adminDeleteUser   = (id, uid) => req("DELETE", `/admin/users/${id}?admin_id=${uid}`);
+export const adminResetPw      = (id, pw, uid) => req("POST", `/admin/users/${id}/reset-password?admin_id=${uid}`, { new_password: pw });
+export const adminListGroups   = (uid) => req("GET", `/admin/groups?admin_id=${uid}`);
+export const adminCreateGroup  = (data, uid) => req("POST", `/admin/groups?admin_id=${uid}`, data);
+export const adminUpdateGroup  = (id, data, uid) => req("PATCH", `/admin/groups/${id}?admin_id=${uid}`, data);
+export const adminDeleteGroup  = (id, uid) => req("DELETE", `/admin/groups/${id}?admin_id=${uid}`);
+export const adminListItems    = (uid) => req("GET", `/admin/items?admin_id=${uid}`);
+export const adminCreateItem   = (data, uid) => req("POST", `/admin/items?admin_id=${uid}`, data);
+export const adminUpdateItem   = (id, data, uid) => req("PATCH", `/admin/items/${id}?admin_id=${uid}`, data);
+export const adminDeleteItem   = (id, uid) => req("DELETE", `/admin/items/${id}?admin_id=${uid}`);

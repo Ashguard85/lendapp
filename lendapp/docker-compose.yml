@@ -1,19 +1,18 @@
 services:
   api:
-    build: .
+    build: ./lendapp
     ports:
       - "8100:8000"
     volumes:
-      - sqlite_data:/data          # persistent DB
-      - ./lendapp.db:/app/lendapp.db  # local dev convenience
+      - /home/buebi/docker/lendapp/data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-volumes:
-  sqlite_data:
+  frontend:
+    build: ./lendapp-frontend
+    ports:
+      - "3100:80"
+    depends_on:
+      - api
+    restart: unless-stopped

@@ -12,10 +12,10 @@ export default function Sidebar() {
   const { pathname } = useLocation();
 
   const links = [
-    { path: "/", label: "Übersicht", icon: "🏠" },
-    { path: "/items", label: "Gegenstände", icon: "📦" },
-    { path: "/bookings", label: "Anfragen", icon: "📋" },
-    { path: "/group", label: "Gruppe", icon: "👥" },
+    { path: "/",         label: "Übersicht",   icon: "🏠" },
+    { path: "/items",    label: "Gegenstände", icon: "📦" },
+    { path: "/bookings", label: "Anfragen",    icon: "📋" },
+    { path: "/group",    label: "Gruppe",      icon: "👥" },
   ];
 
   return (
@@ -26,15 +26,24 @@ export default function Sidebar() {
       </div>
       <nav>
         {links.map(l => (
-          <div
-            key={l.path}
+          <div key={l.path}
             className={`nav-item ${pathname === l.path ? "active" : ""}`}
-            onClick={() => navigate(l.path)}
-          >
+            onClick={() => navigate(l.path)}>
             <span className="nav-icon">{l.icon}</span>
             {l.label}
           </div>
         ))}
+        {user?.is_admin && (
+          <>
+            <div style={{ height: 1, background: "var(--border)", margin: "12px 0" }} />
+            <div className={`nav-item ${pathname.startsWith("/admin") ? "active" : ""}`}
+              onClick={() => navigate("/admin")}
+              style={{ color: "var(--warn)" }}>
+              <span className="nav-icon">⚙️</span>
+              Admin
+            </div>
+          </>
+        )}
       </nav>
       <div className="sidebar-bottom">
         <div className="user-chip">

@@ -16,7 +16,6 @@ export function AuthProvider({ children }) {
   function login(userData) {
     localStorage.setItem("lendapp_user", JSON.stringify(userData));
     setUser(userData);
-    // Gruppe direkt aus Login-Response speichern
     if (userData.group_id) {
       localStorage.setItem("lendapp_group", String(userData.group_id));
       setGroupId(userData.group_id);

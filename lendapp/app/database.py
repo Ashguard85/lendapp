@@ -3,7 +3,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 
-# DB im persistenten Verzeichnis speichern
 DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 SQLALCHEMY_DATABASE_URL = f"sqlite:///{DATA_DIR}/lendapp.db"

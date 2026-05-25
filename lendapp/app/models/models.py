@@ -19,20 +19,22 @@ class User(Base):
     name       = Column(String, nullable=False)
     email      = Column(String, unique=True, index=True, nullable=False)
     password   = Column(String, nullable=False)
+    is_admin   = Column(Boolean, default=False)
+    is_active  = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    items            = relationship("Item", back_populates="owner")
-    bookings         = relationship("Booking", back_populates="borrower")
+    items             = relationship("Item", back_populates="owner")
+    bookings          = relationship("Booking", back_populates="borrower")
     group_memberships = relationship("GroupMember", back_populates="user")
 
 
 class Group(Base):
     __tablename__ = "groups"
 
-    id         = Column(Integer, primary_key=True, index=True)
-    name       = Column(String, nullable=False)
+    id          = Column(Integer, primary_key=True, index=True)
+    name        = Column(String, nullable=False)
     invite_code = Column(String, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
 
     members = relationship("GroupMember", back_populates="group")
     items   = relationship("Item", back_populates="group")
@@ -41,11 +43,11 @@ class Group(Base):
 class GroupMember(Base):
     __tablename__ = "group_members"
 
-    id         = Column(Integer, primary_key=True, index=True)
-    group_id   = Column(Integer, ForeignKey("groups.id"), nullable=False)
-    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
-    is_admin   = Column(Boolean, default=False)
-    joined_at  = Column(DateTime(timezone=True), server_default=func.now())
+    id        = Column(Integer, primary_key=True, index=True)
+    group_id  = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    user_id   = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_admin  = Column(Boolean, default=False)
+    joined_at = Column(DateTime(timezone=True), server_default=func.now())
 
     group = relationship("Group", back_populates="members")
     user  = relationship("User", back_populates="group_memberships")
@@ -54,16 +56,16 @@ class GroupMember(Base):
 class Item(Base):
     __tablename__ = "items"
 
-    id            = Column(Integer, primary_key=True, index=True)
-    name          = Column(String, nullable=False)
-    description   = Column(String, default="")
-    category      = Column(String, default="Sonstiges")
-    image_url     = Column(String, nullable=True)
-    max_days      = Column(Integer, default=14)
-    is_available  = Column(Boolean, default=True)
-    owner_id      = Column(Integer, ForeignKey("users.id"), nullable=False)
-    group_id      = Column(Integer, ForeignKey("groups.id"), nullable=False)
-    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+    id           = Column(Integer, primary_key=True, index=True)
+    name         = Column(String, nullable=False)
+    description  = Column(String, default="")
+    category     = Column(String, default="Sonstiges")
+    image_url    = Column(String, nullable=True)
+    max_days     = Column(Integer, default=14)
+    is_available = Column(Boolean, default=True)
+    owner_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    group_id     = Column(Integer, ForeignKey("groups.id"), nullable=False)
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     owner    = relationship("User", back_populates="items")
     group    = relationship("Group", back_populates="items")

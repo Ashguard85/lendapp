@@ -13,10 +13,15 @@ router = APIRouter()
 def register(data: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "E-Mail bereits registriert")
+
+    # Erster User wird automatisch Admin
+    is_first_user = db.query(User).count() == 0
+
     user = User(
         name=data.name,
         email=data.email,
         password=hash_password(data.password),
+        is_admin=is_first_user,
     )
     db.add(user)
     db.commit()
@@ -34,17 +39,15 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(401, "Ungültige Anmeldedaten")
-    
-    # Erste Gruppe des Users mitliefern
-    membership = db.query(GroupMember).filter(
-        GroupMember.user_id == user.id
-    ).first()
+    if not user.is_active:
+        raise HTTPException(403, "Konto gesperrt")
+    membership = db.query(GroupMember).filter(GroupMember.user_id == user.id).first()
     group_id = membership.group_id if membership else None
-
     return {
         "user_id": user.id,
         "name": user.name,
         "group_id": group_id,
+        "is_admin": user.is_admin,
         "message": "Login erfolgreich"
     }
 
