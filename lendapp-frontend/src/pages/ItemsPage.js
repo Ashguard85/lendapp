@@ -1,7 +1,3 @@
-useEffect(() => {
-  if (!groupId) return setLoading(false);
-  api.getItems(groupId, user.user_id).then(setItems).finally(() => setLoading(false));
-}, [groupId, user.user_id]);
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -51,18 +47,14 @@ function AddItemModal({ onClose, onSaved, groupId, userId }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">➕ Gegenstand erfassen</div>
-        <div
-          onClick={() => fileRef.current.click()}
-          style={{
-            width: "100%", height: 120, borderRadius: 12, marginBottom: 16,
-            border: "2px dashed var(--border)", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            overflow: "hidden", background: "var(--bg2)",
-          }}
-        >
+        <div onClick={() => fileRef.current.click()} style={{
+          width: "100%", height: 120, borderRadius: 12, marginBottom: 16,
+          border: "2px dashed var(--border)", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          overflow: "hidden", background: "var(--bg2)",
+        }}>
           {imagePreview ? (
-            <img src={imagePreview} alt="Vorschau"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img src={imagePreview} alt="Vorschau" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <div style={{ textAlign: "center", color: "var(--text3)" }}>
               <div style={{ fontSize: 32 }}>📷</div>
@@ -70,8 +62,7 @@ function AddItemModal({ onClose, onSaved, groupId, userId }) {
             </div>
           )}
         </div>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
-          onChange={handleImage} />
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImage} />
         <div className="form-group">
           <label className="form-label">Name *</label>
           <input className="form-input" placeholder="z.B. Bohrmaschine"
@@ -87,19 +78,16 @@ function AddItemModal({ onClose, onSaved, groupId, userId }) {
         <div className="form-group">
           <label className="form-label">Beschreibung</label>
           <textarea className="form-input" placeholder="Zustand, Hinweise…"
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
         </div>
         <div className="form-group">
           <label className="form-label">Max. Ausleihzeit (Tage)</label>
           <input className="form-input" type="number" min="1" max="365"
-            value={form.max_days}
-            onChange={e => setForm(f => ({ ...f, max_days: e.target.value }))} />
+            value={form.max_days} onChange={e => setForm(f => ({ ...f, max_days: e.target.value }))} />
         </div>
         {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave}
-            disabled={loading || uploading}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={loading || uploading}>
             {loading ? "…" : "Speichern"}
           </button>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
@@ -139,24 +127,22 @@ function BookingModal({ item, userId, onClose, onBooked }) {
         <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
           <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
             <label className="form-label">Von</label>
-            <input className="form-input" type="date" value={from} min={today}
-              onChange={e => setFrom(e.target.value)} />
+            <input className="form-input" type="date" value={from} min={today} onChange={e => setFrom(e.target.value)} />
           </div>
           <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
             <label className="form-label">Bis</label>
-            <input className="form-input" type="date" value={to} min={from}
-              onChange={e => setTo(e.target.value)} />
+            <input className="form-input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} />
           </div>
         </div>
         <div className="form-group">
           <label className="form-label">Notiz (optional)</label>
-          <input className="form-input" placeholder="Kurze Nachricht…" value={note}
-            onChange={e => setNote(e.target.value)} />
+          <input className="form-input" placeholder="Kurze Nachricht…" value={note} onChange={e => setNote(e.target.value)} />
         </div>
         {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleBook}
-            disabled={loading}>{loading ? "…" : "Anfrage senden"}</button>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleBook} disabled={loading}>
+            {loading ? "…" : "Anfrage senden"}
+          </button>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         </div>
       </div>
@@ -189,14 +175,12 @@ export function ItemDetailPage() {
 
   return (
     <div>
-      <button className="btn btn-secondary btn-sm" style={{ marginBottom: 20 }}
-        onClick={() => navigate("/items")}>← Zurück</button>
+      <button className="btn btn-secondary btn-sm" style={{ marginBottom: 20 }} onClick={() => navigate("/items")}>← Zurück</button>
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card" style={{ marginBottom: 16 }}>
             {item.image_url ? (
-              <img src={item.image_url} alt={item.name}
-                style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
+              <img src={item.image_url} alt={item.name} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
             ) : (
               <div style={{ fontSize: 48, width: "100%", height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg2)", borderRadius: 10, marginBottom: 14 }}>
                 {CATEGORY_EMOJI[item.category] || "📦"}
@@ -208,9 +192,7 @@ export function ItemDetailPage() {
               {item.is_available ? "✓ verfügbar" : "ausgeliehen"}
             </span>
             {item.description && (
-              <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>
-                {item.description}
-              </p>
+              <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>{item.description}</p>
             )}
             <div className="divider" />
             <div style={{ display: "flex", gap: 20, fontSize: 13, color: "var(--text2)" }}>
@@ -219,17 +201,13 @@ export function ItemDetailPage() {
             </div>
           </div>
           {!isOwner && item.is_available && (
-            <button className="btn btn-primary btn-full" onClick={() => setShowBook(true)}>
-              📅 Jetzt anfragen
-            </button>
+            <button className="btn btn-primary btn-full" onClick={() => setShowBook(true)}>📅 Jetzt anfragen</button>
           )}
         </div>
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 14 }}>Buchungshistorie</div>
-            {bookings.length === 0 && (
-              <div style={{ color: "var(--text3)", fontSize: 13 }}>Noch keine Buchungen.</div>
-            )}
+            {bookings.length === 0 && <div style={{ color: "var(--text3)", fontSize: 13 }}>Noch keine Buchungen.</div>}
             {bookings.map(b => (
               <div key={b.id} className="booking-row">
                 <div>
@@ -282,7 +260,7 @@ export default function ItemsPage() {
     if (!groupId) return setLoading(false);
     api.getItems(groupId, user.user_id).then(setItems).finally(() => setLoading(false));
   }
-  useEffect(load, [groupId, user]);
+  useEffect(load, [groupId, user.user_id]);
 
   const filters = ["Alle", "Verfügbar", ...CATEGORIES];
   const filtered = items.filter(i => {
@@ -298,9 +276,7 @@ export default function ItemsPage() {
           <div className="page-title">Gegenstände</div>
           <div className="page-sub">{items.length} Gegenstände in der Gruppe</div>
         </div>
-        {groupId && (
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Erfassen</button>
-        )}
+        {groupId && <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Erfassen</button>}
       </div>
       <div className="chip-row" style={{ marginBottom: 20 }}>
         {filters.map(f => (
@@ -312,8 +288,7 @@ export default function ItemsPage() {
           {filtered.map(item => (
             <div key={item.id} className="item-card" onClick={() => navigate(`/items/${item.id}`)}>
               {item.image_url ? (
-                <img src={item.image_url} alt={item.name}
-                  style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 10 }} />
+                <img src={item.image_url} alt={item.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 10 }} />
               ) : (
                 <div className="item-emoji">{CATEGORY_EMOJI[item.category] || "📦"}</div>
               )}
