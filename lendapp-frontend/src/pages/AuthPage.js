@@ -1,15 +1,4 @@
-const [groupId, setGroupId] = useState(() => {
-  const val = localStorage.getItem("lendapp_group");
-  if (val) {
-    const num = parseInt(val, 10);
-    return isNaN(num) ? null : num;
-  }
-  // Fallback: aus user Objekt lesen
-  try {
-    const u = JSON.parse(localStorage.getItem("lendapp_user"));
-    return u?.group_id || null;
-  } catch { return null; }
-});
+
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import * as api from "../api/client";
