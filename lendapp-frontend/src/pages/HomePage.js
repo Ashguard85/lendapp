@@ -1,11 +1,3 @@
-useEffect(() => {
-  if (!groupId) return setLoading(false);
-  Promise.all([
-    api.getItems(groupId, user.user_id),
-    api.getBookingsForUser(user.user_id),
-  ]).then(([its, bks]) => { setItems(its); setBookings(bks); })
-    .finally(() => setLoading(false));
-}, [groupId, user.user_id]);
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -26,7 +18,7 @@ export default function HomePage() {
       api.getBookingsForUser(user.user_id),
     ]).then(([its, bks]) => { setItems(its); setBookings(bks); })
       .finally(() => setLoading(false));
-  }, [groupId, user]);
+  }, [groupId, user.user_id]);
 
   if (!groupId) return (
     <div>
@@ -51,7 +43,6 @@ export default function HomePage() {
         <div className="page-title">Übersicht</div>
         <div className="page-sub">Was gibt's Neues in deiner Gruppe?</div>
       </div>
-
       <div className="stats-row">
         <div className="stat-card">
           <div className="stat-val">{items.length}</div>
@@ -70,7 +61,6 @@ export default function HomePage() {
           <div className="stat-label">Offene Anfragen</div>
         </div>
       </div>
-
       {pending.length > 0 && (
         <div className="card" style={{ marginBottom: 24, borderLeft: "3px solid var(--warn)" }}>
           <div style={{ fontWeight: 600, marginBottom: 10 }}>⏳ Offene Buchungsanfragen</div>
@@ -83,12 +73,10 @@ export default function HomePage() {
           <button className="btn btn-sm btn-secondary" style={{ marginTop: 12 }} onClick={() => navigate("/bookings")}>Alle anzeigen</button>
         </div>
       )}
-
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <div style={{ fontWeight: 600 }}>Zuletzt hinzugefügt</div>
         <button className="btn btn-sm btn-secondary" onClick={() => navigate("/items")}>Alle anzeigen</button>
       </div>
-
       {loading ? <div style={{ color: "var(--text3)" }}>Lädt…</div> : (
         <div className="card-grid">
           {items.slice(0, 6).map(item => (
