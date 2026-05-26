@@ -7,12 +7,27 @@ services:
       - /home/buebi/docker/lendapp/data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
+      - MAIL_USER=${MAIL_USER}
+      - MAIL_PASS=${MAIL_PASS}
+      - APP_URL=https://lendapp.haasenheim.com
     restart: unless-stopped
 
   frontend:
     build: ./lendapp-frontend
     ports:
       - "3100:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  reminder:
+    image: curlimages/curl:latest
+    entrypoint: >
+      sh -c "while true; do
+        sleep 86400;
+        curl -s -X POST http://api:8000/bookings/reminders;
+        echo 'Reminders sent';
+      done"
     depends_on:
       - api
     restart: unless-stopped

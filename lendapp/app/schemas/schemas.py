@@ -4,7 +4,6 @@ from typing import Optional
 from app.models.models import BookingStatus
 
 
-# ── User ──────────────────────────────────────────────
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
@@ -20,7 +19,6 @@ class UserOut(BaseModel):
     class Config: from_attributes = True
 
 
-# ── Group ─────────────────────────────────────────────
 class GroupCreate(BaseModel):
     name: str
 
@@ -32,7 +30,6 @@ class GroupOut(BaseModel):
     class Config: from_attributes = True
 
 
-# ── Item ──────────────────────────────────────────────
 class ItemCreate(BaseModel):
     name: str
     description: Optional[str] = ""
@@ -63,12 +60,12 @@ class ItemOut(BaseModel):
     class Config: from_attributes = True
 
 
-# ── Booking ───────────────────────────────────────────
 class BookingCreate(BaseModel):
     item_id: int
     date_from: datetime
-    date_to: datetime
+    date_to: Optional[datetime] = None
     note: Optional[str] = ""
+    external_name: Optional[str] = None  # Freitext für externe Person / Eigenbedarf
 
 class BookingStatusUpdate(BaseModel):
     status: BookingStatus
@@ -76,9 +73,10 @@ class BookingStatusUpdate(BaseModel):
 class BookingOut(BaseModel):
     id: int
     item_id: int
-    borrower_id: int
+    borrower_id: Optional[int]
+    external_name: Optional[str]
     date_from: datetime
-    date_to: datetime
+    date_to: Optional[datetime]
     status: BookingStatus
     note: str
     created_at: datetime

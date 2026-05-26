@@ -7,6 +7,7 @@ import * as api from "../api/client";
 const CATEGORIES = ["Werkzeug", "Sport", "Haushalt", "Elektronik", "Sonstiges"];
 
 function fmt(date) {
+  if (!date) return "–";
   return new Date(date).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -15,19 +16,18 @@ const STATUS_LABEL = {
   approved: "✓ genehmigt",
   rejected: "✕ abgelehnt",
   returned: "↩ zurückgegeben",
+  external: "📤 extern/eigenbedarf",
 };
 const STATUS_BADGE = {
   pending:  "badge-orange",
   approved: "badge-green",
   rejected: "badge-gray",
   returned: "badge-blue",
+  external: "badge-orange",
 };
 
 function AddItemModal({ onClose, onSaved, groupId, userId }) {
-  const [form, setForm] = useState({
-    name: "", description: "", category: "Werkzeug",
-    max_days: 14, group_id: parseInt(groupId, 10)
-  });
+  const [form, setForm] = useState({ name: "", description: "", category: "Werkzeug", max_days: 14, group_id: parseInt(groupId, 10) });
   const [imageUrl, setImageUrl] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -39,71 +39,65 @@ function AddItemModal({ onClose, onSaved, groupId, userId }) {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    try {
-      const url = await api.uploadImage(file);
-      setImageUrl(url);
-      setImagePreview(URL.createObjectURL(file));
-    } catch { setError("Bild-Upload fehlgeschlagen"); }
+    try { const url = await api.uploadImage(file); setImageUrl(url); setImagePreview(URL.createObjectURL(file)); }
+    catch { setError("Bild-Upload fehlgeschlagen"); }
     finally { setUploading(false); }
   }
 
   async function handleSave() {
     if (!form.name.trim()) return setError("Name ist Pflicht");
     setLoading(true);
-    try {
-      await api.createItem({ ...form, max_days: Number(form.max_days), image_url: imageUrl }, userId);
-      onSaved();
-    } catch (e) { setError(e.message); }
+    try { await api.createItem({ ...form, max_days: Number(form.max_days), image_url: imageUrl }, userId); onSaved(); }
+    catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">➕ Gegenstand erfassen</div>
-        <div onClick={() => fileRef.current.click()} style={{
-          width: "100%", height: 120, borderRadius: 12, marginBottom: 16,
-          border: "2px dashed var(--border)", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          overflow: "hidden", background: "var(--bg2)",
-        }}>
-          {imagePreview ? (
-            <img src={imagePreview} alt="Vorschau" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <div style={{ textAlign: "center", color: "var(--text3)" }}>
-              <div style={{ fontSize: 32 }}>📷</div>
-              <div style={{ fontSize: 12 }}>{uploading ? "Lädt hoch…" : "Bild hinzufügen (optional)"}</div>
-            </div>
-          )}
+        <div className="modal-title">+ Gegenstand erfassen</div>
+        <div onClick={() => fileRef.current.click()} style={{ width: "100%", height: 110, borderRadius: 12, marginBottom: 16, border: "2px dashed var(--border)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: "var(--bg2)" }}>
+          {imagePreview ? <img src={imagePreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ textAlign: "center", color: "var(--text3)" }}><div style={{ fontSize: 28 }}>📷</div><div style={{ fontSize: 12 }}>{uploading ? "Lädt…" : "Bild hinzufügen (optional)"}</div></div>}
         </div>
         <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleImage} />
-        <div className="form-group">
-          <label className="form-label">Name *</label>
-          <input className="form-input" placeholder="z.B. Bohrmaschine"
-            value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Kategorie</label>
-          <select className="form-input" value={form.category}
-            onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label">Beschreibung</label>
-          <textarea className="form-input" placeholder="Zustand, Hinweise…"
-            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Max. Ausleihzeit (Tage)</label>
-          <input className="form-input" type="number" min="1" max="365"
-            value={form.max_days} onChange={e => setForm(f => ({ ...f, max_days: e.target.value }))} />
-        </div>
+        <div className="form-group"><label className="form-label">Name *</label><input className="form-input" placeholder="z.B. Bohrmaschine" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+        <div className="form-group"><label className="form-label">Kategorie</label><select className="form-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></div>
+        <div className="form-group"><label className="form-label">Beschreibung</label><textarea className="form-input" placeholder="Zustand, Hinweise…" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+        <div className="form-group"><label className="form-label">Max. Ausleihzeit (Tage)</label><input className="form-input" type="number" min="1" max="365" value={form.max_days} onChange={e => setForm(f => ({ ...f, max_days: e.target.value }))} /></div>
         {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={loading || uploading}>
-            {loading ? "…" : "Speichern"}
-          </button>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={loading || uploading}>{loading ? "…" : "Speichern"}</button>
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditItemModal({ item, userId, onClose, onSaved }) {
+  const [form, setForm] = useState({ name: item.name, description: item.description, category: item.category, max_days: item.max_days });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSave() {
+    if (!form.name.trim()) return setError("Name ist Pflicht");
+    setLoading(true);
+    try { await api.updateItem(item.id, { ...form, max_days: Number(form.max_days) }, userId); onSaved(); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">✏️ Bearbeiten</div>
+        <div className="form-group"><label className="form-label">Name *</label><input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
+        <div className="form-group"><label className="form-label">Kategorie</label><select className="form-input" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></div>
+        <div className="form-group"><label className="form-label">Beschreibung</label><textarea className="form-input" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+        <div className="form-group"><label className="form-label">Max. Ausleihzeit (Tage)</label><input className="form-input" type="number" min="1" max="365" value={form.max_days} onChange={e => setForm(f => ({ ...f, max_days: e.target.value }))} /></div>
+        {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={loading}>{loading ? "…" : "Speichern"}</button>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         </div>
       </div>
@@ -123,12 +117,7 @@ function BookingModal({ item, userId, onClose, onBooked }) {
     if (!to) return setError("Bitte Enddatum wählen");
     setLoading(true);
     try {
-      await api.requestBooking({
-        item_id: item.id,
-        date_from: new Date(from).toISOString(),
-        date_to: new Date(to).toISOString(),
-        note
-      }, userId);
+      await api.requestBooking({ item_id: item.id, date_from: new Date(from).toISOString(), date_to: new Date(to).toISOString(), note }, userId);
       onBooked();
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
@@ -139,24 +128,76 @@ function BookingModal({ item, userId, onClose, onBooked }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">📅 {item.name} anfragen</div>
         <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label className="form-label">Von</label>
-            <input className="form-input" type="date" value={from} min={today} onChange={e => setFrom(e.target.value)} />
-          </div>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label className="form-label">Bis</label>
-            <input className="form-input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} />
+          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}><label className="form-label">Von</label><input className="form-input" type="date" value={from} min={today} onChange={e => setFrom(e.target.value)} /></div>
+          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}><label className="form-label">Bis</label><input className="form-input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></div>
+        </div>
+        <div className="form-group"><label className="form-label">Notiz (optional)</label><input className="form-input" placeholder="Kurze Nachricht…" value={note} onChange={e => setNote(e.target.value)} /></div>
+        {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleBook} disabled={loading}>{loading ? "…" : "Anfrage senden"}</button>
+          <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExternalBookingModal({ item, userId, onClose, onBooked }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [externalName, setExternalName] = useState("");
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState("");
+  const [noEndDate, setNoEndDate] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSave() {
+    if (!externalName.trim()) return setError("Bitte Name / Grund eingeben");
+    setLoading(true);
+    try {
+      await api.requestBooking({
+        item_id: item.id,
+        date_from: new Date(from).toISOString(),
+        date_to: noEndDate ? null : (to ? new Date(to).toISOString() : null),
+        note,
+        external_name: externalName,
+      }, userId);
+      onBooked();
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">📤 Extern / Eigenbedarf erfassen</div>
+        <div style={{ background: "var(--bg2)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 13, color: "var(--text2)" }}>
+          Erfasse eine Ausleihe an eine externe Person oder für dich selbst (Eigenbedarf). Der Gegenstand wird sofort als nicht verfügbar markiert.
+        </div>
+        <div className="form-group">
+          <label className="form-label">Person / Grund *</label>
+          <input className="form-input" placeholder='z.B. "Urs" oder "Eigenbedarf"' value={externalName} onChange={e => setExternalName(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Ab</label>
+          <input className="form-input" type="date" value={from} onChange={e => setFrom(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Bis (optional)</label>
+          <input className="form-input" type="date" value={to} min={from} disabled={noEndDate} onChange={e => setTo(e.target.value)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+            <input type="checkbox" id="noend" checked={noEndDate} onChange={e => { setNoEndDate(e.target.checked); if (e.target.checked) setTo(""); }} />
+            <label htmlFor="noend" style={{ fontSize: 13, color: "var(--text2)" }}>Kein Enddatum (offen)</label>
           </div>
         </div>
         <div className="form-group">
           <label className="form-label">Notiz (optional)</label>
-          <input className="form-input" placeholder="Kurze Nachricht…" value={note} onChange={e => setNote(e.target.value)} />
+          <input className="form-input" placeholder="Weitere Infos…" value={note} onChange={e => setNote(e.target.value)} />
         </div>
         {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
         <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleBook} disabled={loading}>
-            {loading ? "…" : "Anfrage senden"}
-          </button>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={loading}>{loading ? "…" : "Erfassen"}</button>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         </div>
       </div>
@@ -171,6 +212,8 @@ export function ItemDetailPage() {
   const [item, setItem] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [showBook, setShowBook] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [showExternal, setShowExternal] = useState(false);
 
   function load() {
     api.getItem(id).then(setItem);
@@ -181,22 +224,35 @@ export function ItemDetailPage() {
   if (!item) return <div style={{ padding: 32, color: "var(--text3)" }}>Lädt…</div>;
 
   const isOwner = item.owner_id === user.user_id;
-  const activeBooking = bookings.find(b => b.status === "approved");
+  const activeBooking = bookings.find(b => b.status === "approved" || b.status === "external");
 
   async function handleStatusChange(bookingId, status) {
     await api.updateBookingStatus(bookingId, status, user.user_id);
     load();
   }
 
+  async function handleDelete() {
+    if (!window.confirm(item.name + " wirklich löschen?")) return;
+    await api.deleteItem(item.id, user.user_id);
+    navigate("/items");
+  }
+
   return (
     <div>
-      <button className="btn btn-secondary btn-sm" style={{ marginBottom: 20 }} onClick={() => navigate("/items")}>← Zurück</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <button className="btn btn-secondary btn-sm" onClick={() => navigate("/items")}>← Zurück</button>
+        {isOwner && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowEdit(true)}>✏️ Bearbeiten</button>
+            <button className="btn btn-danger btn-sm" onClick={handleDelete}>🗑 Löschen</button>
+          </div>
+        )}
+      </div>
       <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card" style={{ marginBottom: 16 }}>
             {item.image_url ? (
-              <img src={item.image_url} alt={item.name}
-                style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
+              <img src={item.image_url} alt={item.name} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
             ) : (
               <div style={{ fontSize: 48, width: "100%", height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg2)", borderRadius: 10, marginBottom: 14 }}>
                 {CATEGORY_EMOJI[item.category] || "📦"}
@@ -204,27 +260,29 @@ export function ItemDetailPage() {
             )}
             <div style={{ fontSize: 20, fontWeight: 600 }}>{item.name}</div>
             <div style={{ color: "var(--text2)", fontSize: 13, marginBottom: 8 }}>{item.category}</div>
-            <span className={`badge ${item.is_available ? "badge-green" : "badge-orange"}`}>
+            <span className={"badge " + (item.is_available ? "badge-green" : "badge-orange")}>
               {item.is_available ? "✓ verfügbar" : "ausgeliehen"}
             </span>
             {!item.is_available && activeBooking && (
               <div style={{ marginTop: 8, fontSize: 13, color: "var(--text2)" }}>
-                📤 Bei <strong>{activeBooking.borrower_name}</strong> · frei ab <strong>{fmt(activeBooking.date_to)}</strong>
+                📤 Bei <strong>{activeBooking.borrower_name}</strong>
+                {activeBooking.date_to ? (" · frei ab " + fmt(activeBooking.date_to)) : " · kein Enddatum"}
               </div>
             )}
-            {item.description && (
-              <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>{item.description}</p>
-            )}
+            {item.description && <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>{item.description}</p>}
             <div className="divider" />
-            <div style={{ display: "flex", gap: 20, fontSize: 13, color: "var(--text2)" }}>
-              <span>Max. <strong>{item.max_days}</strong> Tage</span>
-            </div>
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>Max. <strong>{item.max_days}</strong> Tage</div>
           </div>
           {!isOwner && item.is_available && (
-            <button className="btn btn-primary btn-full" onClick={() => setShowBook(true)}>📅 Jetzt anfragen</button>
+            <button className="btn btn-primary btn-full" style={{ marginBottom: 8 }} onClick={() => setShowBook(true)}>📅 Jetzt anfragen</button>
+          )}
+          {isOwner && item.is_available && (
+            <button className="btn btn-secondary btn-full" onClick={() => setShowExternal(true)}>📤 Extern / Eigenbedarf erfassen</button>
+          )}
+          {isOwner && !item.is_available && activeBooking && activeBooking.status !== "returned" && (
+            <button className="btn btn-secondary btn-full" onClick={() => handleStatusChange(activeBooking.id, "returned")}>↩ Als zurückgegeben markieren</button>
           )}
         </div>
-
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 14 }}>Buchungshistorie</div>
@@ -234,23 +292,20 @@ export function ItemDetailPage() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{b.borrower_name}</div>
                   <div style={{ fontSize: 12, color: "var(--text3)" }}>
-                    {fmt(b.date_from)} – {fmt(b.date_to)}
+                    {fmt(b.date_from)}{b.date_to ? (" – " + fmt(b.date_to)) : " – offen"}
                   </div>
-                  {b.note && <div style={{ fontSize: 12, color: "var(--text2)", fontStyle: "italic" }}>„{b.note}"</div>}
+                  {b.note && <div style={{ fontSize: 12, color: "var(--text2)", fontStyle: "italic" }}>{b.note}</div>}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                  <span className={`badge ${STATUS_BADGE[b.status]}`}>{STATUS_LABEL[b.status]}</span>
+                  <span className={"badge " + STATUS_BADGE[b.status]}>{STATUS_LABEL[b.status]}</span>
                   {isOwner && b.status === "pending" && (
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button className="btn btn-sm" style={{ background: "var(--accent-light)", color: "var(--accent)", padding: "3px 8px", fontSize: 11 }}
-                        onClick={() => handleStatusChange(b.id, "approved")}>✓</button>
-                      <button className="btn btn-sm btn-danger" style={{ padding: "3px 8px", fontSize: 11 }}
-                        onClick={() => handleStatusChange(b.id, "rejected")}>✕</button>
+                      <button className="btn btn-sm" style={{ background: "var(--accent-light)", color: "var(--accent)", padding: "3px 8px", fontSize: 11 }} onClick={() => handleStatusChange(b.id, "approved")}>✓</button>
+                      <button className="btn btn-sm btn-danger" style={{ padding: "3px 8px", fontSize: 11 }} onClick={() => handleStatusChange(b.id, "rejected")}>✕</button>
                     </div>
                   )}
-                  {isOwner && b.status === "approved" && (
-                    <button className="btn btn-sm" style={{ padding: "3px 8px", fontSize: 11, background: "var(--blue-light)", color: "var(--blue)", border: "none" }}
-                      onClick={() => handleStatusChange(b.id, "returned")}>↩ Zurück</button>
+                  {isOwner && (b.status === "approved" || b.status === "external") && (
+                    <button className="btn btn-sm" style={{ padding: "3px 8px", fontSize: 11, background: "var(--blue-light)", color: "var(--blue)", border: "none" }} onClick={() => handleStatusChange(b.id, "returned")}>↩ Zurück</button>
                   )}
                 </div>
               </div>
@@ -258,11 +313,9 @@ export function ItemDetailPage() {
           </div>
         </div>
       </div>
-      {showBook && (
-        <BookingModal item={item} userId={user.user_id}
-          onClose={() => setShowBook(false)}
-          onBooked={() => { setShowBook(false); load(); }} />
-      )}
+      {showBook && <BookingModal item={item} userId={user.user_id} onClose={() => setShowBook(false)} onBooked={() => { setShowBook(false); load(); }} />}
+      {showEdit && <EditItemModal item={item} userId={user.user_id} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); load(); }} />}
+      {showExternal && <ExternalBookingModal item={item} userId={user.user_id} onClose={() => setShowExternal(false)} onBooked={() => { setShowExternal(false); load(); }} />}
     </div>
   );
 }
@@ -298,25 +351,20 @@ export default function ItemsPage() {
         {groupId && <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Erfassen</button>}
       </div>
       <div className="chip-row" style={{ marginBottom: 20 }}>
-        {filters.map(f => (
-          <div key={f} className={`chip ${filter === f ? "active" : ""}`} onClick={() => setFilter(f)}>{f}</div>
-        ))}
+        {filters.map(f => <div key={f} className={"chip " + (filter === f ? "active" : "")} onClick={() => setFilter(f)}>{f}</div>)}
       </div>
       {loading ? <div style={{ color: "var(--text3)" }}>Lädt…</div> : (
         <div className="card-grid">
           {filtered.map(item => (
-            <div key={item.id} className="item-card" onClick={() => navigate(`/items/${item.id}`)}>
+            <div key={item.id} className="item-card" onClick={() => navigate("/items/" + item.id)}>
               {item.image_url ? (
                 <img src={item.image_url} alt={item.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 10 }} />
               ) : (
                 <div className="item-emoji">{CATEGORY_EMOJI[item.category] || "📦"}</div>
               )}
-              <div>
-                <div className="item-name">{item.name}</div>
-                <div className="item-meta">{item.category}</div>
-              </div>
+              <div><div className="item-name">{item.name}</div><div className="item-meta">{item.category}</div></div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className={`badge ${item.is_available ? "badge-green" : "badge-orange"}`}>
+                <span className={"badge " + (item.is_available ? "badge-green" : "badge-orange")}>
                   {item.is_available ? "✓ verfügbar" : "ausgeliehen"}
                 </span>
                 <span className="tag">max. {item.max_days}d</span>
@@ -331,11 +379,7 @@ export default function ItemsPage() {
           )}
         </div>
       )}
-      {showAdd && (
-        <AddItemModal groupId={groupId} userId={user.user_id}
-          onClose={() => setShowAdd(false)}
-          onSaved={() => { setShowAdd(false); load(); }} />
-      )}
+      {showAdd && <AddItemModal groupId={groupId} userId={user.user_id} onClose={() => setShowAdd(false)} onSaved={() => { setShowAdd(false); load(); }} />}
     </div>
   );
 }
