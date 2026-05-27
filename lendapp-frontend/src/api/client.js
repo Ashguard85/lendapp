@@ -7,10 +7,7 @@ function headers(userId) {
 }
 
 async function req(method, path, body, userId) {
-  const options = {
-    method,
-    headers: headers(userId),
-  };
+  const options = { method, headers: headers(userId) };
   if (body !== undefined && method !== "GET" && method !== "DELETE") {
     options.body = JSON.stringify(body);
   }
@@ -25,8 +22,7 @@ async function req(method, path, body, userId) {
 
 // Auth
 export const register = (data) => req("POST", "/users/register", data);
-export const login = (email, password) =>
-  req("POST", "/users/login", { email, password });
+export const login = (email, password) => req("POST", "/users/login", { email, password });
 
 // Groups
 export const createGroup = (data, uid) => req("POST", `/groups/?user_id=${uid}`, data, uid);
@@ -46,34 +42,30 @@ export const requestBooking = (data, uid) => req("POST", `/bookings/?user_id=${u
 export const getBookingsForItem = (itemId) => req("GET", `/bookings/item/${itemId}`);
 export const getBookingsForUser = (uid) => req("GET", `/bookings/user/${uid}`, undefined, uid);
 export const getPendingForOwner = (uid) => req("GET", `/bookings/pending/owner/${uid}`, undefined, uid);
-export const updateBookingStatus = (id, status, uid) =>
-  req("PATCH", `/bookings/${id}/status?user_id=${uid}`, { status }, uid);
+export const updateBookingStatus = (id, status, uid) => req("PATCH", `/bookings/${id}/status?user_id=${uid}`, { status }, uid);
 
 // Upload
 export async function uploadImage(file) {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${BASE}/upload/`, {
-    method: "POST",
-    body: formData,
-  });
+  const res = await fetch(`${BASE}/upload/`, { method: "POST", body: formData });
   if (!res.ok) throw new Error("Upload fehlgeschlagen");
   const data = await res.json();
   return data.url;
 }
 
-// Admin
-export const adminStats        = (uid) => req("GET", `/admin/stats?admin_id=${uid}`, undefined, uid);
-export const adminListUsers    = (uid) => req("GET", `/admin/users?admin_id=${uid}`, undefined, uid);
-export const adminCreateUser   = (data, uid) => req("POST", `/admin/users?admin_id=${uid}`, data, uid);
-export const adminUpdateUser   = (id, data, uid) => req("PATCH", `/admin/users/${id}?admin_id=${uid}`, data, uid);
-export const adminDeleteUser   = (id, uid) => req("DELETE", `/admin/users/${id}?admin_id=${uid}`, undefined, uid);
-export const adminResetPw      = (id, pw, uid) => req("POST", `/admin/users/${id}/reset-password?admin_id=${uid}`, { new_password: pw }, uid);
-export const adminListGroups   = (uid) => req("GET", `/admin/groups?admin_id=${uid}`, undefined, uid);
-export const adminCreateGroup  = (data, uid) => req("POST", `/admin/groups?admin_id=${uid}`, data, uid);
-export const adminUpdateGroup  = (id, data, uid) => req("PATCH", `/admin/groups/${id}?admin_id=${uid}`, data, uid);
-export const adminDeleteGroup  = (id, uid) => req("DELETE", `/admin/groups/${id}?admin_id=${uid}`, undefined, uid);
-export const adminListItems    = (uid) => req("GET", `/admin/items?admin_id=${uid}`, undefined, uid);
-export const adminCreateItem   = (data, uid) => req("POST", `/admin/items?admin_id=${uid}`, data, uid);
-export const adminUpdateItem   = (id, data, uid) => req("PATCH", `/admin/items/${id}?admin_id=${uid}`, data, uid);
-export const adminDeleteItem   = (id, uid) => req("DELETE", `/admin/items/${id}?admin_id=${uid}`, undefined, uid);
+// Admin – Auth via X-User-Id Header (nur für Admins)
+export const adminStats       = (uid) => req("GET",    `/admin/stats`,                    undefined, uid);
+export const adminListUsers   = (uid) => req("GET",    `/admin/users`,                    undefined, uid);
+export const adminCreateUser  = (data, uid) => req("POST",   `/admin/users`,              data,      uid);
+export const adminUpdateUser  = (id, data, uid) => req("PATCH",  `/admin/users/${id}`,   data,      uid);
+export const adminDeleteUser  = (id, uid) => req("DELETE", `/admin/users/${id}`,          undefined, uid);
+export const adminResetPw     = (id, pw, uid) => req("POST", `/admin/users/${id}/reset-password`, { new_password: pw }, uid);
+export const adminListGroups  = (uid) => req("GET",    `/admin/groups`,                   undefined, uid);
+export const adminCreateGroup = (data, uid) => req("POST",   `/admin/groups`,             data,      uid);
+export const adminUpdateGroup = (id, data, uid) => req("PATCH",  `/admin/groups/${id}`,  data,      uid);
+export const adminDeleteGroup = (id, uid) => req("DELETE", `/admin/groups/${id}`,         undefined, uid);
+export const adminListItems   = (uid) => req("GET",    `/admin/items`,                    undefined, uid);
+export const adminCreateItem  = (data, uid) => req("POST",   `/admin/items`,              data,      uid);
+export const adminUpdateItem  = (id, data, uid) => req("PATCH",  `/admin/items/${id}`,   data,      uid);
+export const adminDeleteItem  = (id, uid) => req("DELETE", `/admin/items/${id}`,          undefined, uid);

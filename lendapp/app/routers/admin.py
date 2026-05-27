@@ -1,23 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
+from typing import Optional
+import secrets
 from app.database import get_db
 from app.models.models import User, Group, GroupMember, Item, Booking
 from app.auth import hash_password
+from app.dependencies import get_admin_user
 
 router = APIRouter()
 
 
-# ── Admin Auth Helper ─────────────────────────────────
-def get_admin(admin_id: int, db: Session):
-    user = db.query(User).filter(User.id == admin_id, User.is_admin == True).first()
-    if not user:
-        raise HTTPException(403, "Kein Admin-Zugriff")
-    return user
-
-
-# ── Schemas ───────────────────────────────────────────
 class AdminUserCreate(BaseModel):
     name: str
     email: EmailStr
@@ -57,56 +50,35 @@ class PasswordReset(BaseModel):
     new_password: str
 
 
-# ── Stats ─────────────────────────────────────────────
 @router.get("/stats")
-def get_stats(admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def get_stats(db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     return {
-        "users":    db.query(User).count(),
-        "groups":   db.query(Group).count(),
-        "items":    db.query(Item).count(),
-        "bookings": db.query(Booking).count(),
+        "users":          db.query(User).count(),
+        "groups":         db.query(Group).count(),
+        "items":          db.query(Item).count(),
+        "bookings":       db.query(Booking).count(),
         "active_users":   db.query(User).filter(User.is_active == True).count(),
         "inactive_users": db.query(User).filter(User.is_active == False).count(),
     }
 
 
-# ── Users ─────────────────────────────────────────────
 @router.get("/users")
-def list_users(admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def list_users(db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     users = db.query(User).all()
-    return [
-        {
-            "id": u.id, "name": u.name, "email": u.email,
-            "is_admin": u.is_admin, "is_active": u.is_active,
-            "created_at": u.created_at,
-            "groups": [m.group_id for m in u.group_memberships],
-            "item_count": len(u.items),
-        }
-        for u in users
-    ]
+    return [{"id": u.id, "name": u.name, "email": u.email, "is_admin": u.is_admin, "is_active": u.is_active, "created_at": u.created_at, "groups": [m.group_id for m in u.group_memberships], "item_count": len(u.items)} for u in users]
 
 
 @router.post("/users", status_code=201)
-def create_user(data: AdminUserCreate, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def create_user(data: AdminUserCreate, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "E-Mail bereits registriert")
-    user = User(
-        name=data.name, email=data.email,
-        password=hash_password(data.password),
-        is_admin=data.is_admin,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    user = User(name=data.name, email=data.email, password=hash_password(data.password), is_admin=data.is_admin)
+    db.add(user); db.commit(); db.refresh(user)
     return {"id": user.id, "name": user.name, "email": user.email}
 
 
 @router.patch("/users/{user_id}")
-def update_user(user_id: int, data: AdminUserUpdate, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def update_user(user_id: int, data: AdminUserUpdate, db: Session = Depends(get_db), admin: User = Depends(get_admin_user)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(404, "User nicht gefunden")
@@ -117,8 +89,7 @@ def update_user(user_id: int, data: AdminUserUpdate, admin_id: int, db: Session 
 
 
 @router.post("/users/{user_id}/reset-password")
-def reset_password(user_id: int, data: PasswordReset, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def reset_password(user_id: int, data: PasswordReset, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(404, "User nicht gefunden")
@@ -128,116 +99,75 @@ def reset_password(user_id: int, data: PasswordReset, admin_id: int, db: Session
 
 
 @router.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: int, admin_id: int, db: Session = Depends(get_db)):
-    admin = get_admin(admin_id, db)
+def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_admin_user)):
     if admin.id == user_id:
         raise HTTPException(400, "Du kannst dich nicht selbst löschen")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(404, "User nicht gefunden")
-    db.delete(user)
-    db.commit()
+    db.delete(user); db.commit()
 
 
-# ── Groups ────────────────────────────────────────────
 @router.get("/groups")
-def list_groups(admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def list_groups(db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     groups = db.query(Group).all()
-    return [
-        {
-            "id": g.id, "name": g.name, "invite_code": g.invite_code,
-            "created_at": g.created_at,
-            "member_count": len(g.members),
-            "item_count": len(g.items),
-        }
-        for g in groups
-    ]
+    return [{"id": g.id, "name": g.name, "invite_code": g.invite_code, "created_at": g.created_at, "member_count": len(g.members), "item_count": len(g.items)} for g in groups]
 
 
 @router.post("/groups", status_code=201)
-def create_group(data: AdminGroupCreate, admin_id: int, db: Session = Depends(get_db)):
-    import secrets
-    get_admin(admin_id, db)
+def create_group(data: AdminGroupCreate, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     group = Group(name=data.name, invite_code=secrets.token_urlsafe(8))
-    db.add(group)
-    db.commit()
-    db.refresh(group)
+    db.add(group); db.commit(); db.refresh(group)
     return {"id": group.id, "name": group.name, "invite_code": group.invite_code}
 
 
 @router.patch("/groups/{group_id}")
-def update_group(group_id: int, data: AdminGroupUpdate, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def update_group(group_id: int, data: AdminGroupUpdate, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(404, "Gruppe nicht gefunden")
-    group.name = data.name
-    db.commit()
+    group.name = data.name; db.commit()
     return {"id": group.id, "name": group.name}
 
 
 @router.delete("/groups/{group_id}", status_code=204)
-def delete_group(group_id: int, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def delete_group(group_id: int, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     group = db.query(Group).filter(Group.id == group_id).first()
     if not group:
         raise HTTPException(404, "Gruppe nicht gefunden")
-    db.delete(group)
-    db.commit()
+    db.delete(group); db.commit()
 
 
 @router.post("/groups/{group_id}/members/{user_id}")
-def add_member(group_id: int, user_id: int, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
-    existing = db.query(GroupMember).filter_by(group_id=group_id, user_id=user_id).first()
-    if existing:
+def add_member(group_id: int, user_id: int, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
+    if db.query(GroupMember).filter_by(group_id=group_id, user_id=user_id).first():
         raise HTTPException(400, "Bereits Mitglied")
-    db.add(GroupMember(group_id=group_id, user_id=user_id))
-    db.commit()
+    db.add(GroupMember(group_id=group_id, user_id=user_id)); db.commit()
     return {"message": "Mitglied hinzugefügt"}
 
 
 @router.delete("/groups/{group_id}/members/{user_id}", status_code=204)
-def remove_member(group_id: int, user_id: int, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def remove_member(group_id: int, user_id: int, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     member = db.query(GroupMember).filter_by(group_id=group_id, user_id=user_id).first()
     if not member:
         raise HTTPException(404, "Mitglied nicht gefunden")
-    db.delete(member)
-    db.commit()
+    db.delete(member); db.commit()
 
 
-# ── Items ─────────────────────────────────────────────
 @router.get("/items")
-def list_items(admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def list_items(db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     items = db.query(Item).all()
-    return [
-        {
-            "id": i.id, "name": i.name, "category": i.category,
-            "description": i.description, "image_url": i.image_url,
-            "max_days": i.max_days, "is_available": i.is_available,
-            "owner_id": i.owner_id, "group_id": i.group_id,
-            "created_at": i.created_at,
-        }
-        for i in items
-    ]
+    return [{"id": i.id, "name": i.name, "category": i.category, "description": i.description, "image_url": i.image_url, "max_days": i.max_days, "is_available": i.is_available, "owner_id": i.owner_id, "group_id": i.group_id, "created_at": i.created_at} for i in items]
 
 
 @router.post("/items", status_code=201)
-def create_item(data: AdminItemCreate, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
-    item = Item(**data.model_dump())
-    db.add(item)
-    db.commit()
-    db.refresh(item)
+def create_item(data: AdminItemCreate, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
+    item = Item(**data.model_dump()); db.add(item); db.commit(); db.refresh(item)
     return {"id": item.id, "name": item.name}
 
 
 @router.patch("/items/{item_id}")
-def update_item(item_id: int, data: AdminItemUpdate, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def update_item(item_id: int, data: AdminItemUpdate, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(404, "Artikel nicht gefunden")
@@ -248,10 +178,8 @@ def update_item(item_id: int, data: AdminItemUpdate, admin_id: int, db: Session 
 
 
 @router.delete("/items/{item_id}", status_code=204)
-def delete_item(item_id: int, admin_id: int, db: Session = Depends(get_db)):
-    get_admin(admin_id, db)
+def delete_item(item_id: int, db: Session = Depends(get_db), _: User = Depends(get_admin_user)):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(404, "Artikel nicht gefunden")
-    db.delete(item)
-    db.commit()
+    db.delete(item); db.commit()
