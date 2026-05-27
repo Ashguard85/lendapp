@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./components/Toast";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
+import AiChat from "./components/AiChat";
 import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import ItemsPage, { ItemDetailPage } from "./pages/ItemsPage";
@@ -39,6 +40,7 @@ function AppShell() {
         </Routes>
       </main>
       <BottomNav />
+      <AiChat />
     </div>
   );
 }

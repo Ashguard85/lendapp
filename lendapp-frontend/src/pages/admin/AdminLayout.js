@@ -27,45 +27,39 @@ export default function AdminLayout({ children }) {
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
       {/* Admin Sidebar */}
-      <div style={{ width: 220, background: "#1C1A16", display: "flex", flexDirection: "column", padding: "24px 16px", flexShrink: 0 }}>
-        <div style={{ color: "#fff", fontWeight: 600, fontSize: 16, marginBottom: 6, display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: 200, minWidth: 200, background: "#1C1A16", display: "flex", flexDirection: "column", padding: "24px 14px", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
+        <div style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
           <span>⚙️</span> Admin
         </div>
-        <div style={{ color: "#9E9B94", fontSize: 12, marginBottom: 28 }}>LendApp</div>
+        <div style={{ color: "#666", fontSize: 11, marginBottom: 28 }}>LendApp</div>
         <nav style={{ flex: 1 }}>
           {links.map(l => (
-            <div key={l.path}
-              onClick={() => navigate(l.path)}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "9px 12px", borderRadius: 8, cursor: "pointer",
-                marginBottom: 2, fontSize: 14, fontWeight: 500,
-                background: pathname === l.path ? "rgba(255,255,255,0.1)" : "transparent",
-                color: pathname === l.path ? "#fff" : "#9E9B94",
-                transition: "all 0.15s",
-              }}
-            >
+            <div key={l.path} onClick={() => navigate(l.path)} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "9px 12px", borderRadius: 8, cursor: "pointer",
+              marginBottom: 2, fontSize: 13, fontWeight: 500,
+              background: pathname === l.path ? "rgba(255,255,255,0.12)" : "transparent",
+              color: pathname === l.path ? "#fff" : "#9E9B94",
+              transition: "all 0.15s",
+            }}>
               <span>{l.icon}</span>{l.label}
             </div>
           ))}
         </nav>
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16 }}>
-          <div style={{ color: "#9E9B94", fontSize: 12, marginBottom: 10 }}>{user.name}</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => navigate("/")}
-              style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, color: "#fff", padding: "7px 10px", fontSize: 12, cursor: "pointer" }}>
-              ← App
-            </button>
-            <button onClick={logout}
-              style={{ flex: 1, background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, color: "#fff", padding: "7px 10px", fontSize: 12, cursor: "pointer" }}>
-              Logout
-            </button>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 14 }}>
+          <div style={{ color: "#666", fontSize: 11, marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => navigate("/")} style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, color: "#ccc", padding: "6px 8px", fontSize: 11, cursor: "pointer" }}>← App</button>
+            <button onClick={logout} style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "none", borderRadius: 6, color: "#ccc", padding: "6px 8px", fontSize: 11, cursor: "pointer" }}>Logout</button>
           </div>
         </div>
       </div>
-      {/* Content */}
-      <main style={{ flex: 1, padding: 32, overflowY: "auto" }}>
-        {children}
+
+      {/* Content – volle Breite mit Scroll */}
+      <main style={{ flex: 1, minWidth: 0, overflowX: "auto", overflowY: "auto", padding: "32px 28px" }}>
+        <div style={{ minWidth: 700 }}>
+          {children}
+        </div>
       </main>
     </div>
   );
