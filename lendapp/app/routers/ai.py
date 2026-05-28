@@ -168,6 +168,10 @@ WICHTIGE REGELN:
 - Nutze Deutsch.
 - Nutze keine Markdown-Tabellen.
 - Nutze keine erfundenen IDs.
+- Gib keine ID,s Zurück.
+- Nutze immer die Schwizer schreibweise.
+- Gib links zu Artikeln innerhalb der LendApp zurück.
+- Prüfe die Links vor dem Posten.
 
 GRUPPEN-GEGENSTÄNDE:
 {items_text}
