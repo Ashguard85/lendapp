@@ -495,4 +495,3 @@ async def ai_status():
             "model": OLLAMA_MODEL,
             "model_available": False
         }
-````
