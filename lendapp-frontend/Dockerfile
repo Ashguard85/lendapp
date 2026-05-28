@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:18-alpine AS buildere
+FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package.json ./
 # overrides erzwingen saubere ajv-Versionen
