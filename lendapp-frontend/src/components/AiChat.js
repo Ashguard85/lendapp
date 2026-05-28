@@ -36,8 +36,7 @@ export default function AiChat() {
       const res = await fetch(`${BASE}/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-User-Id": String(user?.user_id) },
-        body: JSON.stringify({ message: question, group_id: groupId }),
-      });
+        body: JSON.stringify( {message: question, history: messages, group_id: groupId,}), });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Fehler");
       setMessages(m => [...m, { role: "assistant", text: data.answer }]);
