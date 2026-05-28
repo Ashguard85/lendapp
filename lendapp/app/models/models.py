@@ -64,6 +64,7 @@ class Item(Base):
     description  = Column(String, default="")
     category     = Column(String, default="Sonstiges")
     image_url    = Column(String, nullable=True)
+    thumb_url    = Column(String, nullable=True)
     max_days     = Column(Integer, default=14)
     is_available = Column(Boolean, default=True)
     owner_id     = Column(Integer, ForeignKey("users.id"), nullable=False)

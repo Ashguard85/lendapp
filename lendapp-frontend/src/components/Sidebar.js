@@ -7,7 +7,7 @@ const CATEGORY_EMOJI = {
 export { CATEGORY_EMOJI };
 
 export default function Sidebar() {
-  const { user, groupId, groups, setGroup, logout } = useAuth();
+  const { user, groups, logout } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -15,10 +15,8 @@ export default function Sidebar() {
     { path: "/",         label: "Übersicht",   icon: "🏠" },
     { path: "/items",    label: "Gegenstände", icon: "📦" },
     { path: "/bookings", label: "Anfragen",    icon: "📋" },
-    { path: "/group",    label: "Gruppe",      icon: "👥" },
+    { path: "/group",    label: "Gruppen",     icon: "👥" },
   ];
-
-  const currentGroup = groups.find(g => g.id === groupId);
 
   return (
     <div className="sidebar">
@@ -26,27 +24,6 @@ export default function Sidebar() {
         <div className="logo-dot" />
         LendApp
       </div>
-
-      {/* Gruppen-Wechsler */}
-      {groups.length > 0 && (
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 10, color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Aktive Gruppe</div>
-          <select
-            value={groupId || ""}
-            onChange={e => setGroup(e.target.value)}
-            style={{
-              width: "100%", padding: "7px 10px", borderRadius: 8,
-              border: "1px solid var(--border)", background: "var(--bg2)",
-              color: "var(--text)", fontSize: 13, cursor: "pointer", outline: "none",
-            }}
-          >
-            {groups.map(g => (
-              <option key={g.id} value={g.id}>{g.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       <nav>
         {links.map(l => (
           <div key={l.path}
@@ -54,6 +31,11 @@ export default function Sidebar() {
             onClick={() => navigate(l.path)}>
             <span className="nav-icon">{l.icon}</span>
             {l.label}
+            {l.path === "/group" && groups.length > 1 && (
+              <span style={{ marginLeft: "auto", background: "var(--accent-light)", color: "var(--accent)", borderRadius: 20, fontSize: 10, padding: "1px 7px", fontWeight: 600 }}>
+                {groups.length}
+              </span>
+            )}
           </div>
         ))}
         {user?.is_admin && (
@@ -68,14 +50,13 @@ export default function Sidebar() {
           </>
         )}
       </nav>
-
       <div className="sidebar-bottom">
         <div className="user-chip">
           <div className="avatar">{user?.name?.[0]?.toUpperCase()}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name}</div>
             <div style={{ fontSize: 11, color: "var(--text3)" }}>
-              {groups.length > 1 ? `${groups.length} Gruppen` : currentGroup?.name || "Keine Gruppe"}
+              {groups.length} Gruppe{groups.length !== 1 ? "n" : ""}
             </div>
           </div>
           <span style={{ cursor: "pointer", fontSize: 16 }} onClick={logout} title="Logout">↩</span>

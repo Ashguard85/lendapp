@@ -11,9 +11,11 @@ from app.mail import (
 
 router = APIRouter()
 
+BUFFER_DAYS = 1  # Puffer vor/nach Buchung
+
 
 def _get_item_or_404(db, item_id):
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
     return item
@@ -27,31 +29,58 @@ def fmt_date(dt):
 
 def booking_with_names(b: Booking, db: Session):
     borrower = db.query(User).filter(User.id == b.borrower_id).first() if b.borrower_id else None
-    item = db.query(Item).filter(Item.id == b.item_id).first()
-    owner = db.query(User).filter(User.id == item.owner_id).first() if item else None
-    display_name = b.external_name if b.external_name else (borrower.name if borrower else f"User #{b.borrower_id}")
+    item     = db.query(Item).filter(Item.id == b.item_id).first()
+    owner    = db.query(User).filter(User.id == item.owner_id).first() if item else None
+    display  = b.external_name if b.external_name else (borrower.name if borrower else f"User #{b.borrower_id}")
     return {
-        "id": b.id,
-        "item_id": b.item_id,
-        "item_name": item.name if item else f"Item #{b.item_id}",
-        "borrower_id": b.borrower_id,
-        "borrower_name": display_name,
+        "id":            b.id,
+        "item_id":       b.item_id,
+        "item_name":     item.name if item else f"Item #{b.item_id}",
+        "borrower_id":   b.borrower_id,
+        "borrower_name": display,
         "external_name": b.external_name,
-        "owner_id": item.owner_id if item else None,
-        "owner_name": owner.name if owner else None,
-        "date_from": b.date_from,
-        "date_to": b.date_to,
-        "status": b.status,
-        "note": b.note,
-        "created_at": b.created_at,
+        "owner_id":      item.owner_id if item else None,
+        "owner_name":    owner.name if owner else None,
+        "date_from":     b.date_from,
+        "date_to":       b.date_to,
+        "status":        b.status,
+        "note":          b.note,
+        "created_at":    b.created_at,
     }
 
 
+def _check_overlap(db, item_id: int, date_from: datetime, date_to: datetime, exclude_id: int = None):
+    """
+    Prüft Überschneidungen mit Puffer.
+    Bestehende Buchung: [existing_from - BUFFER, existing_to + BUFFER]
+    Neue Buchung darf nicht in diesen Bereich fallen.
+    """
+    if not date_to:
+        return None
+
+    q = db.query(Booking).filter(
+        Booking.item_id == item_id,
+        Booking.status.in_([BookingStatus.approved, BookingStatus.external]),
+    )
+    if exclude_id:
+        q = q.filter(Booking.id != exclude_id)
+
+    for b in q.all():
+        b_from = b.date_from - timedelta(days=BUFFER_DAYS)
+        b_to   = (b.date_to + timedelta(days=BUFFER_DAYS)) if b.date_to else None
+
+        if b_to is None:
+            # Offene Buchung – blockiert alles ab date_from - buffer
+            if date_to > b_from:
+                return b
+        else:
+            # Überschneidung: neue Buchung liegt im gepufferten Bereich
+            if date_from < b_to and date_to > b_from:
+                return b
+    return None
+
+
 def _update_availability(item: Item, db: Session):
-    """
-    Prüft ob das Item ab morgen wieder verfügbar ist.
-    Verfügbar wenn keine aktive Buchung (approved/external) mehr läuft.
-    """
     tomorrow = datetime.utcnow() + timedelta(days=1)
     active = (
         db.query(Booking)
@@ -64,43 +93,51 @@ def _update_availability(item: Item, db: Session):
     item.is_available = active is None
 
 
+def _send_new_booking_mail(booking: Booking, item: Item, db: Session):
+    """Mail an Besitzer – für direkte und Agent-Buchungen."""
+    owner    = db.query(User).filter(User.id == item.owner_id).first()
+    borrower = db.query(User).filter(User.id == booking.borrower_id).first() if booking.borrower_id else None
+    if owner and borrower:
+        mail_new_booking(
+            owner_email=owner.email,
+            owner_name=owner.name,
+            borrower_name=borrower.name,
+            item_name=item.name,
+            date_from=fmt_date(booking.date_from),
+            date_to=fmt_date(booking.date_to),
+            note=booking.note or "",
+        )
+
+
 @router.post("/", status_code=201)
 def request_booking(data: BookingCreate, user_id: int, db: Session = Depends(get_db)):
-    item = _get_item_or_404(db, data.item_id)
+    item        = _get_item_or_404(db, data.item_id)
     is_external = bool(data.external_name)
-    is_owner = item.owner_id == user_id
+    is_owner    = item.owner_id == user_id
 
     if is_external and not is_owner:
         raise HTTPException(403, "Nur der Besitzer kann externe Ausleihen erfassen")
     if data.date_to and data.date_from >= data.date_to:
         raise HTTPException(400, "Enddatum muss nach Startdatum liegen")
 
-    # Max-Tage nur bei normalen Buchungen prüfen, nicht bei extern/eigenbedarf
+    # Max-Tage nur bei normalen Buchungen
     if not is_external and data.date_to:
         days = (data.date_to - data.date_from).days
         if days > item.max_days:
             raise HTTPException(400, f"Maximale Ausleihzeit: {item.max_days} Tage")
 
-    # Überschneidung prüfen – Verfügbar ab 1 Tag nach Rückgabe
+    # Überschneidung mit Puffer prüfen
     if data.date_to:
-        overlap = (
-            db.query(Booking)
-            .filter(
-                Booking.item_id == data.item_id,
-                Booking.status.in_([BookingStatus.approved, BookingStatus.external]),
-                Booking.date_from < data.date_to,
-                (Booking.date_to == None) | (Booking.date_to + timedelta(days=1) > data.date_from),
-            ).first()
-        )
+        overlap = _check_overlap(db, data.item_id, data.date_from, data.date_to)
         if overlap:
-            raise HTTPException(409, f"Zeitraum bereits vergeben. Verfügbar ab {fmt_date(overlap.date_to + timedelta(days=1) if overlap.date_to else None)}")
+            next_free = (overlap.date_to + timedelta(days=BUFFER_DAYS)) if overlap.date_to else None
+            msg = f"Zeitraum bereits vergeben."
+            if next_free:
+                msg += f" Frühestens buchbar ab {fmt_date(next_free)}."
+            raise HTTPException(409, msg)
 
-    if is_external:
-        status = BookingStatus.external
-        borrower_id = None
-    else:
-        status = BookingStatus.pending
-        borrower_id = user_id
+    status     = BookingStatus.external if is_external else BookingStatus.pending
+    borrower_id = None if is_external else user_id
 
     booking = Booking(
         item_id=data.item_id,
@@ -112,54 +149,38 @@ def request_booking(data: BookingCreate, user_id: int, db: Session = Depends(get
         status=status,
     )
     db.add(booking)
-
     if is_external:
         item.is_available = False
-
     db.commit()
     db.refresh(booking)
 
-    # Mail an Besitzer bei neuer Anfrage
+    # Mail an Besitzer
     if not is_external:
-        owner = db.query(User).filter(User.id == item.owner_id).first()
-        borrower = db.query(User).filter(User.id == user_id).first()
-        if owner and borrower:
-            mail_new_booking(
-                owner_email=owner.email,
-                owner_name=owner.name,
-                borrower_name=borrower.name,
-                item_name=item.name,
-                date_from=fmt_date(data.date_from),
-                date_to=fmt_date(data.date_to),
-                note=data.note or "",
-            )
+        _send_new_booking_mail(booking, item, db)
 
     return booking_with_names(booking, db)
 
 
 @router.get("/item/{item_id}")
 def bookings_for_item(item_id: int, db: Session = Depends(get_db)):
-    bookings = db.query(Booking).filter(Booking.item_id == item_id).all()
-    return [booking_with_names(b, db) for b in bookings]
+    return [booking_with_names(b, db) for b in db.query(Booking).filter(Booking.item_id == item_id).all()]
 
 
 @router.get("/user/{user_id}")
 def bookings_for_user(user_id: int, db: Session = Depends(get_db)):
-    bookings = db.query(Booking).filter(Booking.borrower_id == user_id).all()
-    return [booking_with_names(b, db) for b in bookings]
+    return [booking_with_names(b, db) for b in db.query(Booking).filter(Booking.borrower_id == user_id).all()]
 
 
 @router.get("/pending/owner/{owner_id}")
 def pending_for_owner(owner_id: int, db: Session = Depends(get_db)):
-    items = db.query(Item).filter(Item.owner_id == owner_id).all()
+    items    = db.query(Item).filter(Item.owner_id == owner_id, Item.deleted_at == None).all()
     item_ids = [i.id for i in items]
     if not item_ids:
         return []
-    bookings = (
-        db.query(Booking)
-        .filter(Booking.item_id.in_(item_ids), Booking.status == BookingStatus.pending)
-        .all()
-    )
+    bookings = db.query(Booking).filter(
+        Booking.item_id.in_(item_ids),
+        Booking.status == BookingStatus.pending,
+    ).all()
     return [booking_with_names(b, db) for b in bookings]
 
 
@@ -175,7 +196,6 @@ def update_status(booking_id: int, data: BookingStatusUpdate, user_id: int, db: 
     booking.status = data.status
     db.flush()
 
-    # Verfügbarkeit neu berechnen
     if data.status in [BookingStatus.approved, BookingStatus.external]:
         item.is_available = False
     elif data.status in [BookingStatus.returned, BookingStatus.rejected]:
@@ -184,8 +204,7 @@ def update_status(booking_id: int, data: BookingStatusUpdate, user_id: int, db: 
     db.commit()
     db.refresh(booking)
 
-    # Mails
-    owner = db.query(User).filter(User.id == item.owner_id).first()
+    owner    = db.query(User).filter(User.id == item.owner_id).first()
     borrower = db.query(User).filter(User.id == booking.borrower_id).first() if booking.borrower_id else None
 
     if borrower:
@@ -211,24 +230,20 @@ def update_status(booking_id: int, data: BookingStatusUpdate, user_id: int, db: 
 
 @router.post("/reminders")
 def send_reminders(db: Session = Depends(get_db)):
-    """Täglich aufgerufen – sendet Erinnerungen für morgen ablaufende Buchungen."""
     tomorrow_start = datetime.utcnow().replace(hour=0, minute=0, second=0) + timedelta(days=1)
     tomorrow_end   = tomorrow_start + timedelta(days=1)
 
-    bookings = (
-        db.query(Booking)
-        .filter(
-            Booking.status == BookingStatus.approved,
-            Booking.date_to >= tomorrow_start,
-            Booking.date_to < tomorrow_end,
-        ).all()
-    )
+    bookings = db.query(Booking).filter(
+        Booking.status == BookingStatus.approved,
+        Booking.date_to >= tomorrow_start,
+        Booking.date_to < tomorrow_end,
+    ).all()
 
     sent = 0
     for b in bookings:
         borrower = db.query(User).filter(User.id == b.borrower_id).first() if b.borrower_id else None
-        item = db.query(Item).filter(Item.id == b.item_id).first()
-        owner = db.query(User).filter(User.id == item.owner_id).first() if item else None
+        item     = db.query(Item).filter(Item.id == b.item_id).first()
+        owner    = db.query(User).filter(User.id == item.owner_id).first() if item else None
         if borrower and item and owner:
             mail_return_reminder(
                 borrower_email=borrower.email,
@@ -239,14 +254,11 @@ def send_reminders(db: Session = Depends(get_db)):
             )
             sent += 1
 
-    # Verfügbarkeit automatisch aktualisieren für abgelaufene Buchungen
-    expired = (
-        db.query(Booking)
-        .filter(
-            Booking.status.in_([BookingStatus.approved, BookingStatus.external]),
-            Booking.date_to < datetime.utcnow(),
-        ).all()
-    )
+    # Verfügbarkeit für abgelaufene Buchungen updaten
+    expired = db.query(Booking).filter(
+        Booking.status.in_([BookingStatus.approved, BookingStatus.external]),
+        Booking.date_to < datetime.utcnow(),
+    ).all()
     for b in expired:
         item = db.query(Item).filter(Item.id == b.item_id).first()
         if item:
@@ -254,3 +266,29 @@ def send_reminders(db: Session = Depends(get_db)):
     db.commit()
 
     return {"reminders_sent": sent, "availability_updated": len(expired)}
+
+
+@router.get("/item/{item_id}/blocked")
+def get_blocked_dates(item_id: int, db: Session = Depends(get_db)):
+    """Gibt alle gesperrten Datumsbereiche zurück (inkl. Puffer)."""
+    bookings = db.query(Booking).filter(
+        Booking.item_id == item_id,
+        Booking.status.in_([BookingStatus.approved, BookingStatus.external]),
+    ).all()
+
+    ranges = []
+    for b in bookings:
+        if not b.date_to:
+            # Offene Buchung – sperrt ab date_from - buffer für immer
+            ranges.append({
+                "from": (b.date_from - timedelta(days=BUFFER_DAYS)).strftime("%Y-%m-%d"),
+                "to":   None,
+                "open": True,
+            })
+        else:
+            ranges.append({
+                "from": (b.date_from - timedelta(days=BUFFER_DAYS)).strftime("%Y-%m-%d"),
+                "to":   (b.date_to   + timedelta(days=BUFFER_DAYS)).strftime("%Y-%m-%d"),
+                "open": False,
+            })
+    return ranges

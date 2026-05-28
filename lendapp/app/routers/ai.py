@@ -1,360 +1,185 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
-import httpx
-import json
-import os
-import re
-
+from typing import List, Optional
+from datetime import datetime, timedelta
+import httpx, json, os
 from app.database import get_db
-from app.models.models import (
-    User,
-    Item,
-    Booking,
-    GroupMember,
-    BookingStatus,
-)
+from app.models.models import User, Item, Booking, GroupMember, BookingStatus
 from app.dependencies import get_current_user
+from app.mail import mail_new_booking
 
 router = APIRouter()
 
-OLLAMA_URL   = os.getenv("OLLAMA_URL", "http://host.docker.internal:11434")
+OLLAMA_URL   = os.getenv("OLLAMA_URL",   "http://host.docker.internal:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+APP_URL      = os.getenv("APP_URL",      "https://lendapp.haasenheim.com")
+BUFFER_DAYS  = 1
 
 
-# =========================
-# REQUEST MODELS
-# =========================
-
-class ChatMessage(BaseModel):
+class Message(BaseModel):
     role: str
-    text: str
+    content: str
 
 
 class ChatRequest(BaseModel):
     message: str
     group_id: int
-    history: Optional[List[ChatMessage]] = []
+    history: Optional[List[Message]] = []
 
 
-# =========================
-# HELPERS
-# =========================
-
-def _get_group_items(user: User, group_id: int, db: Session):
-    membership = (
-        db.query(GroupMember)
-        .filter_by(group_id=group_id, user_id=user.id)
-        .first()
-    )
-
-    if not membership:
+def _check_membership(user_id: int, group_id: int, db: Session):
+    if not db.query(GroupMember).filter_by(group_id=group_id, user_id=user_id).first():
         raise HTTPException(403, "Kein Zugriff auf diese Gruppe")
 
-    return (
-        db.query(Item)
-        .filter(
-            Item.group_id == group_id,
-            Item.deleted_at == None
-        )
-        .all()
-    )
+
+def fmt(dt):
+    return dt.strftime("%d.%m.%Y") if dt else "offen"
 
 
-def _get_item_status(item: Item, db: Session):
-    """
-    Prüft live aktive Buchungen statt nur item.is_available.
-    """
-
-    active_booking = (
-        db.query(Booking)
-        .filter(
-            Booking.item_id == item.id,
-            Booking.status.in_([
-                BookingStatus.approved,
-                BookingStatus.external
-            ]),
-            Booking.date_to >= datetime.now()
-        )
-        .order_by(Booking.date_to.asc())
-        .first()
-    )
-
-    if not active_booking:
-        return True, "verfügbar"
-
-    if active_booking.borrower_id:
-        borrower = (
-            db.query(User)
-            .filter(User.id == active_booking.borrower_id)
-            .first()
-        )
-
-        borrower_name = borrower.name if borrower else "Unbekannt"
-
-        return (
-            False,
-            f"ausgeliehen bis {active_booking.date_to.strftime('%d.%m.%Y')} (bei {borrower_name})"
-        )
-
-    if active_booking.external_name:
-        return (
-            False,
-            f"ausgeliehen bis {active_booking.date_to.strftime('%d.%m.%Y')} (bei {active_booking.external_name})"
-        )
-
-    return (
-        False,
-        f"ausgeliehen bis {active_booking.date_to.strftime('%d.%m.%Y')}"
-    )
+def _get_visible_items(user: User, group_id: int, db: Session):
+    """Nur fremde Gegenstände (nicht die eigenen)."""
+    return db.query(Item).filter(
+        Item.group_id == group_id,
+        Item.deleted_at == None,
+        Item.owner_id != user.id,
+    ).all()
 
 
 def _build_context(user: User, group_id: int, db: Session) -> str:
-    items = _get_group_items(user, group_id, db)
-
+    _check_membership(user.id, group_id, db)
+    items = _get_visible_items(user, group_id, db)
     lines = []
-
-    # Begrenzen damit Context nicht explodiert
-    limited_items = items[:120]
-
-    for item in limited_items:
-        owner = (
-            db.query(User)
-            .filter(User.id == item.owner_id)
-            .first()
-        )
-
-        owner_name = owner.name if owner else "Unbekannt"
-
-        is_available, status = _get_item_status(item, db)
-
-        is_mine = item.owner_id == user.id
-
-        mine = (
-            " [DEIN ARTIKEL]"
-            if is_mine
-            else f" [Besitzer: {owner_name}]"
-        )
-
-        lines.append(
-            f"- ID:{item.id} | "
-            f"{item.name} | "
-            f"{item.category} | "
-            f"{status}{mine}"
-        )
-
-    items_text = "\n".join(lines) if lines else "Keine Gegenstände."
+    for item in items:
+        owner = db.query(User).filter(User.id == item.owner_id).first()
+        if item.is_available:
+            status = "verfügbar"
+        else:
+            active = db.query(Booking).filter(
+                Booking.item_id == item.id,
+                Booking.status.in_([BookingStatus.approved, BookingStatus.external])
+            ).first()
+            if active and active.date_to:
+                next_free = active.date_to + timedelta(days=BUFFER_DAYS)
+                status = f"ausgeliehen bis {fmt(active.date_to)}, wieder buchbar ab {fmt(next_free)}"
+            else:
+                status = "aktuell nicht verfügbar"
+        # Interne ID nur für Tool-Calls, NICHT in Antworten
+        lines.append(f'- "{item.name}" (Kategorie: {item.category}, Besitzer: {owner.name if owner else "?"}, Status: {status}) [intern_id={item.id}]')
 
     today = datetime.now().strftime("%d.%m.%Y")
+    items_block = "\n".join(lines) if lines else "Aktuell keine ausleihbaren Gegenstände von anderen."
 
-    return f"""
-Du bist der KI-Assistent von LendApp.
+    return f"""Du bist der freundliche Assistent von Lendapp, einer App zum Ausleihen von Gegenständen unter Freunden und Familie.
 
-Heute: {today}
+Eingeloggter Nutzer: {user.name}
+Heutiges Datum: {today}
 
-Eingeloggter Benutzer:
-- Name: {user.name}
-- User-ID: {user.id}
+Ausleihbare Gegenstände (nur diese kennst du, NUR von anderen Personen):
+{items_block}
 
 WICHTIGE REGELN:
-- Nutze ausschließlich die bereitgestellten Daten.
-- Erfinde niemals Gegenstände, Personen oder Buchungen.
-- Zeige niemals Daten außerhalb dieser Gruppe.
-- Wenn Informationen fehlen, sage das klar.
-- Antworte kurz und freundlich.
-- Antworten maximal 3 Sätze.
-- Nutze Deutsch.
-- Nutze keine Markdown-Tabellen.
-- Nutze keine erfundenen IDs.
-- Gib keine ID,s Zurück.
-- Nutze immer die Schwizer schreibweise.
+1. Erwähne NIEMALS interne IDs (intern_id) in deinen Antworten. Diese sind nur für dich.
+2. Erwähne NIE Gegenstände die dem Nutzer selbst gehören.
+3. Wenn du einen Gegenstand empfiehlst, biете einen Link an im Format: [Gegenstandsname](ITEM_LINK:intern_id)
+   Beispiel: "Schau dir die [Bohrmaschine](ITEM_LINK:5) an."
+   Das System wandelt das automatisch in einen echten Link um.
+4. Antworte auf Deutsch, freundlich, kurz und natürlich.
+5. Zeige nie Daten ausserhalb dieser Liste.
 
-GRUPPEN-GEGENSTÄNDE:
-{items_text}
-
-MÖGLICHE AKTIONEN:
-1. CREATE_BOOKING
-2. CANCEL_BOOKING
-
-WENN EINE AKTION AUSGEFÜHRT WERDEN SOLL:
-- Antworte AUSSCHLIESSLICH mit gültigem JSON.
-- KEIN Markdown.
-- KEIN ```json.
-- KEIN zusätzlicher Text.
-
-FORMATE:
-
-{{
-  "action": "CREATE_BOOKING",
-  "item_id": 1,
-  "date_from": "2026-06-01",
-  "date_to": "2026-06-07",
-  "note": ""
-}}
-
-{{
-  "action": "CANCEL_BOOKING",
-  "booking_id": 5
-}}
-"""
+Für Aktionen antworte NUR mit JSON:
+{{"action": "CREATE_BOOKING", "item_id": 5, "date_from": "2026-06-01", "date_to": "2026-06-07", "note": ""}}
+{{"action": "CANCEL_BOOKING", "booking_id": 3}}"""
 
 
-def _extract_json(text: str):
-    """
-    Extrahiert robust erstes JSON-Objekt aus AI-Antwort.
-    """
-
-    try:
-        return json.loads(text)
-    except:
-        pass
-
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-
-    if not match:
-        return None
-
-    try:
-        return json.loads(match.group())
-    except:
-        return None
-
-
-def _execute_action(
-    action_data: dict,
-    user: User,
-    group_id: int,
-    db: Session
-) -> str:
-
+def _execute_action(action_data: dict, user: User, group_id: int, db: Session) -> str:
     action = action_data.get("action")
 
-    # =========================
-    # CREATE BOOKING
-    # =========================
-
     if action == "CREATE_BOOKING":
-
         item_id = action_data.get("item_id")
-
-        item = (
-            db.query(Item)
-            .filter(
-                Item.id == item_id,
-                Item.deleted_at == None,
-                Item.group_id == group_id,
-            )
-            .first()
-        )
-
+        item = db.query(Item).filter(
+            Item.id == item_id, Item.deleted_at == None, Item.group_id == group_id
+        ).first()
         if not item:
-            return "❌ Artikel nicht gefunden."
-
+            return "Diesen Gegenstand konnte ich leider nicht finden."
         if item.owner_id == user.id:
-            return "❌ Du kannst deinen eigenen Artikel nicht buchen."
-
-        is_available, _ = _get_item_status(item, db)
-
-        if not is_available:
-            return f"❌ {item.name} ist aktuell nicht verfügbar."
-
+            return "Das ist dein eigener Gegenstand – den musst du nicht ausleihen 😊"
         try:
-            date_from = datetime.strptime(
-                action_data["date_from"],
-                "%Y-%m-%d"
-            )
-
-            date_to = datetime.strptime(
-                action_data["date_to"],
-                "%Y-%m-%d"
-            )
-
+            date_from = datetime.strptime(action_data["date_from"], "%Y-%m-%d")
+            date_to   = datetime.strptime(action_data["date_to"],   "%Y-%m-%d")
         except:
-            return "❌ Ungültiges Datum."
+            return "Das Datum habe ich nicht verstanden. Kannst du es nochmal nennen?"
 
-        if date_to < date_from:
-            return "❌ Das Enddatum liegt vor dem Startdatum."
-
-        overlapping = (
-            db.query(Booking)
-            .filter(
-                Booking.item_id == item.id,
-                Booking.status.in_([
-                    BookingStatus.pending,
-                    BookingStatus.approved,
-                    BookingStatus.external
-                ]),
-                Booking.date_from <= date_to,
-                Booking.date_to >= date_from
-            )
-            .first()
-        )
-
-        if overlapping:
-            return "❌ Für diesen Zeitraum existiert bereits eine Buchung."
+        from app.routers.bookings import _check_overlap
+        overlap = _check_overlap(db, item_id, date_from, date_to)
+        if overlap:
+            next_free = (overlap.date_to + timedelta(days=BUFFER_DAYS)) if overlap.date_to else None
+            msg = f"„{item.name}" ist in diesem Zeitraum leider schon vergeben."
+            if next_free:
+                msg += f" Frühestens wieder ab {fmt(next_free)}."
+            return msg
 
         booking = Booking(
-            item_id=item.id,
-            borrower_id=user.id,
-            date_from=date_from,
-            date_to=date_to,
-            note=action_data.get("note", "KI-Buchung"),
+            item_id=item_id, borrower_id=user.id,
+            date_from=date_from, date_to=date_to,
+            note=action_data.get("note") or "Buchung über Assistent",
             status=BookingStatus.pending,
         )
+        db.add(booking); db.commit(); db.refresh(booking)
 
-        db.add(booking)
-        db.commit()
-
-        owner = (
-            db.query(User)
-            .filter(User.id == item.owner_id)
-            .first()
-        )
-
-        owner_name = owner.name if owner else "Der Besitzer"
-
-        return (
-            f"✅ Buchungsanfrage für {item.name} "
-            f"vom {date_from.strftime('%d.%m.%Y')} "
-            f"bis {date_to.strftime('%d.%m.%Y')} wurde gesendet. "
-            f"{owner_name} muss noch bestätigen."
-        )
-
-    # =========================
-    # CANCEL BOOKING
-    # =========================
+        owner = db.query(User).filter(User.id == item.owner_id).first()
+        if owner:
+            mail_new_booking(
+                owner_email=owner.email, owner_name=owner.name,
+                borrower_name=user.name, item_name=item.name,
+                date_from=fmt(date_from), date_to=fmt(date_to),
+                note=booking.note,
+            )
+        return f"✅ Deine Anfrage für „{item.name}" ({fmt(date_from)} – {fmt(date_to)}) ist raus! {owner.name if owner else 'Der Besitzer'} bekommt eine Benachrichtigung."
 
     elif action == "CANCEL_BOOKING":
-
         booking_id = action_data.get("booking_id")
-
-        booking = (
-            db.query(Booking)
-            .filter(
-                Booking.id == booking_id,
-                Booking.borrower_id == user.id,
-                Booking.status == BookingStatus.pending,
-            )
-            .first()
-        )
-
+        booking = db.query(Booking).filter(
+            Booking.id == booking_id, Booking.borrower_id == user.id,
+            Booking.status == BookingStatus.pending,
+        ).first()
         if not booking:
-            return "❌ Buchung nicht gefunden oder nicht stornierbar."
-
+            return "Diese Buchung konnte ich nicht finden oder sie lässt sich nicht mehr stornieren."
         booking.status = BookingStatus.rejected
-
         db.commit()
+        return "✅ Deine Anfrage wurde storniert."
 
-        return f"✅ Buchungsanfrage #{booking_id} wurde storniert."
-
-    return "❌ Unbekannte Aktion."
+    return "Diese Aktion kenne ich leider nicht."
 
 
-# =========================
-# CHAT ENDPOINT
-# =========================
+def _resolve_links(text: str, user: User, group_id: int, db: Session) -> str:
+    """
+    Wandelt ITEM_LINK:id in echte, geprüfte Links um.
+    Nur gültige, sichtbare (fremde) Gegenstände werden verlinkt.
+    Ungültige Links werden entfernt.
+    """
+    import re
+
+    visible_ids = {i.id for i in _get_visible_items(user, group_id, db)}
+
+    def replace(match):
+        label = match.group(1)
+        try:
+            item_id = int(match.group(2))
+        except:
+            return label
+        # Link nur wenn Gegenstand existiert UND sichtbar ist
+        if item_id in visible_ids:
+            return f"[{label}]({APP_URL}/items/{item_id})"
+        # Ungültig → nur Label ohne Link
+        return label
+
+    # Pattern: [Label](ITEM_LINK:123)
+    text = re.sub(r'\[([^\]]+)\]\(ITEM_LINK:(\d+)\)', replace, text)
+    # Falls Modell rohe intern_id Erwähnungen einbaut – entfernen
+    text = re.sub(r'\s*\[?intern_id=\d+\]?', '', text)
+    return text
+
 
 @router.post("/chat")
 async def chat(
@@ -362,138 +187,49 @@ async def chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    context = _build_context(current_user, data.group_id, db)
 
-    context = _build_context(
-        current_user,
-        data.group_id,
-        db
-    )
+    # Gesprächsverlauf aufbauen
+    messages = [{"role": "system", "content": context}]
+    for m in (data.history or [])[-10:]:  # letzte 10 Nachrichten
+        if m.role in ("user", "assistant"):
+            messages.append({"role": m.role, "content": m.content})
+    messages.append({"role": "user", "content": data.message})
 
-    messages = [
-        {
-            "role": "system",
-            "content": context
-        }
-    ]
-
-    # Conversation Memory
-    for msg in data.history[-12:]:
-
-        if msg.role not in ["user", "assistant"]:
-            continue
-
-        messages.append({
-            "role": msg.role,
-            "content": msg.text
-        })
-
-    # Aktuelle Nachricht
-    messages.append({
-        "role": "user",
-        "content": data.message
-    })
-
-    payload = {
-        "model": OLLAMA_MODEL,
-        "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": 0.2
-        }
-    }
+    payload = {"model": OLLAMA_MODEL, "messages": messages, "stream": False}
 
     try:
-
         async with httpx.AsyncClient(timeout=90.0) as client:
-
-            res = await client.post(
-                f"{OLLAMA_URL}/api/chat",
-                json=payload
-            )
-
+            res = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
             res.raise_for_status()
+            answer = res.json()["message"]["content"].strip()
 
-            answer = (
-                res.json()["message"]["content"]
-                .strip()
-            )
+            # Aktion?
+            if answer.startswith("{") and "action" in answer:
+                try:
+                    action_data = json.loads(answer)
+                    result = _execute_action(action_data, current_user, data.group_id, db)
+                    return {"answer": result, "model": OLLAMA_MODEL, "action_taken": True}
+                except json.JSONDecodeError:
+                    pass
 
-            # =========================
-            # JSON ACTION PARSING
-            # =========================
-
-            action_data = _extract_json(answer)
-
-            if action_data and "action" in action_data:
-
-                result = _execute_action(
-                    action_data,
-                    current_user,
-                    data.group_id,
-                    db
-                )
-
-                return {
-                    "answer": result,
-                    "model": OLLAMA_MODEL,
-                    "action_taken": True
-                }
-
-            return {
-                "answer": answer,
-                "model": OLLAMA_MODEL,
-                "action_taken": False
-            }
+            # Links auflösen und prüfen
+            answer = _resolve_links(answer, current_user, data.group_id, db)
+            return {"answer": answer, "model": OLLAMA_MODEL, "action_taken": False}
 
     except httpx.ConnectError:
-        raise HTTPException(
-            503,
-            "Ollama nicht erreichbar – läuft der Service?"
-        )
-
+        raise HTTPException(503, "Ollama nicht erreichbar")
     except Exception as e:
-        raise HTTPException(
-            500,
-            f"AI-Fehler: {str(e)}"
-        )
+        raise HTTPException(500, f"AI-Fehler: {str(e)}")
 
-
-# =========================
-# STATUS
-# =========================
 
 @router.get("/status")
 async def ai_status():
-
     try:
-
         async with httpx.AsyncClient(timeout=5.0) as client:
-
-            res = await client.get(
-                f"{OLLAMA_URL}/api/tags"
-            )
-
-            models = [
-                m["name"]
-                for m in res.json().get("models", [])
-            ]
-
-            available = any(
-                OLLAMA_MODEL.split(":")[0] in m
-                for m in models
-            )
-
-            return {
-                "ollama": "online",
-                "model": OLLAMA_MODEL,
-                "model_available": available,
-                "available_models": models
-            }
-
+            res    = await client.get(f"{OLLAMA_URL}/api/tags")
+            models = [m["name"] for m in res.json().get("models", [])]
+            avail  = any(OLLAMA_MODEL.split(":")[0] in m for m in models)
+            return {"ollama": "online", "model": OLLAMA_MODEL, "model_available": avail}
     except:
-
-        return {
-            "ollama": "offline",
-            "model": OLLAMA_MODEL,
-            "model_available": False
-        }
+        return {"ollama": "offline", "model": OLLAMA_MODEL, "model_available": False}

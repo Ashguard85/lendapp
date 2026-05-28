@@ -43,7 +43,7 @@ body {
   padding: 24px 16px;
   position: sticky; top: 0; height: 100vh;
 }
-.main { flex: 1; padding: 32px;}
+.main { flex: 1; padding: 32px; max-width: 900px; }
 
 /* Sidebar */
 .logo { font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 32px; display: flex; align-items: center; gap: 8px; }

@@ -6,17 +6,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem("lendapp_user")); } catch { return null; }
   });
-  const [groupId, setGroupId] = useState(() => {
-    const val = localStorage.getItem("lendapp_group");
-    if (val) { const n = parseInt(val, 10); return isNaN(n) ? null : n; }
-    try {
-      const u = JSON.parse(localStorage.getItem("lendapp_user"));
-      return u?.group_id || null;
-    } catch { return null; }
-  });
   const [groups, setGroups] = useState(() => {
     try { return JSON.parse(localStorage.getItem("lendapp_groups")) || []; } catch { return []; }
   });
+
+  // groupId bleibt für AI-Chat und Buchungen (erste Gruppe als Default)
+  const groupId = groups.length > 0 ? groups[0].id : null;
+  const groupIds = groups.map(g => g.id);
 
   function login(userData) {
     localStorage.setItem("lendapp_user", JSON.stringify(userData));
@@ -25,26 +21,13 @@ export function AuthProvider({ children }) {
       localStorage.setItem("lendapp_groups", JSON.stringify(userData.groups));
       setGroups(userData.groups);
     }
-    if (userData.group_id) {
-      localStorage.setItem("lendapp_group", String(userData.group_id));
-      setGroupId(userData.group_id);
-    }
   }
 
   function logout() {
     localStorage.removeItem("lendapp_user");
-    localStorage.removeItem("lendapp_group");
     localStorage.removeItem("lendapp_groups");
     setUser(null);
-    setGroupId(null);
     setGroups([]);
-  }
-
-  function setGroup(id) {
-    const numId = parseInt(String(id), 10);
-    if (isNaN(numId)) return;
-    localStorage.setItem("lendapp_group", String(numId));
-    setGroupId(numId);
   }
 
   function addGroup(group) {
@@ -53,8 +36,18 @@ export function AuthProvider({ children }) {
     setGroups(updated);
   }
 
+  // setGroup bleibt für Kompatibilität (z.B. nach Gruppe erstellen)
+  function setGroup(id) {
+    const g = groups.find(g => g.id === parseInt(id));
+    if (!g) return;
+    // Gewählte Gruppe an erste Stelle
+    const updated = [g, ...groups.filter(x => x.id !== g.id)];
+    localStorage.setItem("lendapp_groups", JSON.stringify(updated));
+    setGroups(updated);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, groupId, groups, login, logout, setGroup, addGroup }}>
+    <AuthContext.Provider value={{ user, groups, groupId, groupIds, login, logout, addGroup, setGroup }}>
       {children}
     </AuthContext.Provider>
   );
