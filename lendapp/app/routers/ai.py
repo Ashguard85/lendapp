@@ -172,6 +172,7 @@ WICHTIGE REGELN:
 - Nutze immer die Schwizer schreibweise.
 - Gib links zu Artikeln innerhalb der LendApp zurück.
 - Prüfe die Links vor dem Posten.
+- Nenne keine eigenen Gegenstände als buchbar.
 
 GRUPPEN-GEGENSTÄNDE:
 {items_text}
