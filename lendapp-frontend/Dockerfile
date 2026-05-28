@@ -2,9 +2,12 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package.json ./
+# overrides erzwingen saubere ajv-Versionen
 RUN npm install --legacy-peer-deps
 COPY . .
-ENV NODE_OPTIONS=--max-old-space-size=1024
+ENV NODE_OPTIONS=--max-old-space-size=2048
+ENV CI=false
+ENV GENERATE_SOURCEMAP=false
 RUN npm run build
 
 # Stage 2: Serve with nginx

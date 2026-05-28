@@ -81,7 +81,7 @@ Ausleihbare Gegenstände (nur diese kennst du, NUR von anderen Personen):
 WICHTIGE REGELN:
 1. Erwähne NIEMALS interne IDs (intern_id) in deinen Antworten. Diese sind nur für dich.
 2. Erwähne NIE Gegenstände die dem Nutzer selbst gehören.
-3. Wenn du einen Gegenstand empfiehlst, biете einen Link an im Format: [Gegenstandsname](ITEM_LINK:intern_id)
+3. Wenn du einen Gegenstand empfiehlst, biete einen Link an im Format: [Gegenstandsname](ITEM_LINK:intern_id)
    Beispiel: "Schau dir die [Bohrmaschine](ITEM_LINK:5) an."
    Das System wandelt das automatisch in einen echten Link um.
 4. Antworte auf Deutsch, freundlich, kurz und natürlich.
