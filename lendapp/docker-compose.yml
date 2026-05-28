@@ -1,25 +1,31 @@
 services:
   api:
-    build: ./lendapp
+    build:
+      context: https://github.com/Ashguard85/lendapp.git#main:lendapp
     ports:
       - "8100:8000"
     volumes:
       - /home/buebi/docker/lendapp/data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
-      - MAIL_USER=${MAIL_USER}
-      - MAIL_PASS=${MAIL_PASS}
-      - APP_URL=https://lendapp.haasenheim.com
+      - MAIL_USER=${Mail}
+      - MAIL_PASS=${Pass}
+      - APP_URL=${URL}
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${Modell}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
-
+    
   frontend:
-    build: ./lendapp-frontend
+    build:
+      context: https://github.com/Ashguard85/lendapp.git#main:lendapp-frontend
     ports:
       - "3100:80"
     depends_on:
       - api
     restart: unless-stopped
-
+    
   reminder:
     image: curlimages/curl:latest
     entrypoint: >
