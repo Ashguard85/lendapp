@@ -10,7 +10,7 @@ class BookingStatus(str, enum.Enum):
     approved = "approved"
     rejected = "rejected"
     returned = "returned"
-    external = "external"  # Manueller Eintrag
+    external = "external"
 
 
 class User(Base):
@@ -23,6 +23,7 @@ class User(Base):
     is_admin   = Column(Boolean, default=False)
     is_active  = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     items             = relationship("Item", back_populates="owner")
     bookings          = relationship("Booking", back_populates="borrower")
@@ -36,6 +37,7 @@ class Group(Base):
     name        = Column(String, nullable=False)
     invite_code = Column(String, unique=True, index=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at  = Column(DateTime(timezone=True), nullable=True)
 
     members = relationship("GroupMember", back_populates="group")
     items   = relationship("Item", back_populates="group")
@@ -67,6 +69,7 @@ class Item(Base):
     owner_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
     group_id     = Column(Integer, ForeignKey("groups.id"), nullable=False)
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
+    deleted_at   = Column(DateTime(timezone=True), nullable=True)
 
     owner    = relationship("User", back_populates="items")
     group    = relationship("Group", back_populates="items")
@@ -76,15 +79,15 @@ class Item(Base):
 class Booking(Base):
     __tablename__ = "bookings"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    item_id         = Column(Integer, ForeignKey("items.id"), nullable=False)
-    borrower_id     = Column(Integer, ForeignKey("users.id"), nullable=True)  # Null bei extern
-    external_name   = Column(String, nullable=True)   # Freitext z.B. "Urs" oder "Eigenbedarf"
-    date_from       = Column(DateTime, nullable=False)
-    date_to         = Column(DateTime, nullable=True)  # Optional bei Eigenbedarf
-    status          = Column(Enum(BookingStatus), default=BookingStatus.pending)
-    note            = Column(String, default="")
-    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+    id            = Column(Integer, primary_key=True, index=True)
+    item_id       = Column(Integer, ForeignKey("items.id"), nullable=False)
+    borrower_id   = Column(Integer, ForeignKey("users.id"), nullable=True)
+    external_name = Column(String, nullable=True)
+    date_from     = Column(DateTime, nullable=False)
+    date_to       = Column(DateTime, nullable=True)
+    status        = Column(Enum(BookingStatus), default=BookingStatus.pending)
+    note          = Column(String, default="")
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
 
     item     = relationship("Item", back_populates="bookings")
     borrower = relationship("User", back_populates="bookings")

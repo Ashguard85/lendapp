@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 from typing import List, Optional
 from app.database import get_db
 from app.models.models import Item, GroupMember
@@ -32,7 +33,8 @@ def list_items(
     db: Session = Depends(get_db),
 ):
     _check_member(db, group_id, user_id)
-    q = db.query(Item).filter(Item.group_id == group_id)
+    # Soft delete: nur nicht gelöschte Items
+    q = db.query(Item).filter(Item.group_id == group_id, Item.deleted_at == None)
     if category:
         q = q.filter(Item.category == category)
     if available_only:
@@ -42,7 +44,7 @@ def list_items(
 
 @router.get("/{item_id}", response_model=ItemOut)
 def get_item(item_id: int, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
     return item
@@ -50,7 +52,7 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{item_id}", response_model=ItemOut)
 def update_item(item_id: int, data: ItemUpdate, user_id: int, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
     if item.owner_id != user_id:
@@ -64,10 +66,12 @@ def update_item(item_id: int, data: ItemUpdate, user_id: int, db: Session = Depe
 
 @router.delete("/{item_id}", status_code=204)
 def delete_item(item_id: int, user_id: int, db: Session = Depends(get_db)):
-    item = db.query(Item).filter(Item.id == item_id).first()
+    item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
     if item.owner_id != user_id:
         raise HTTPException(403, "Nur der Besitzer darf löschen")
-    db.delete(item)
+    # Soft delete – Buchungshistorie bleibt erhalten
+    item.deleted_at = func.now()
+    item.is_available = False
     db.commit()

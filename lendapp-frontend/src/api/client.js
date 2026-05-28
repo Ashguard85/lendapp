@@ -69,3 +69,6 @@ export const adminListItems   = (uid) => req("GET",    `/admin/items`,          
 export const adminCreateItem  = (data, uid) => req("POST",   `/admin/items`,              data,      uid);
 export const adminUpdateItem  = (id, data, uid) => req("PATCH",  `/admin/items/${id}`,   data,      uid);
 export const adminDeleteItem  = (id, uid) => req("DELETE", `/admin/items/${id}`,          undefined, uid);
+
+// Multi-Group
+export const getUserGroups = (uid) => req("GET", `/groups/user/${uid}/all`, undefined, uid);
