@@ -49,14 +49,19 @@ def booking_with_names(b: Booking, db: Session):
     }
 
 
+def _naive(dt):
+    """Timezone-Info entfernen fuer einheitlichen Vergleich."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=None) if dt.tzinfo else dt
+
+
 def _check_overlap(db, item_id: int, date_from: datetime, date_to: datetime, exclude_id: int = None):
-    """
-    Prüft Überschneidungen mit Puffer.
-    Bestehende Buchung: [existing_from - BUFFER, existing_to + BUFFER]
-    Neue Buchung darf nicht in diesen Bereich fallen.
-    """
     if not date_to:
         return None
+
+    df = _naive(date_from)
+    dt = _naive(date_to)
 
     q = db.query(Booking).filter(
         Booking.item_id == item_id,
@@ -66,16 +71,14 @@ def _check_overlap(db, item_id: int, date_from: datetime, date_to: datetime, exc
         q = q.filter(Booking.id != exclude_id)
 
     for b in q.all():
-        b_from = b.date_from - timedelta(days=BUFFER_DAYS)
-        b_to   = (b.date_to + timedelta(days=BUFFER_DAYS)) if b.date_to else None
+        b_from = _naive(b.date_from) - timedelta(days=BUFFER_DAYS)
+        b_to   = (_naive(b.date_to) + timedelta(days=BUFFER_DAYS)) if b.date_to else None
 
         if b_to is None:
-            # Offene Buchung – blockiert alles ab date_from - buffer
-            if date_to > b_from:
+            if dt > b_from:
                 return b
         else:
-            # Überschneidung: neue Buchung liegt im gepufferten Bereich
-            if date_from < b_to and date_to > b_from:
+            if df < b_to and dt > b_from:
                 return b
     return None
 
@@ -123,7 +126,7 @@ def request_booking(data: BookingCreate, user_id: int, db: Session = Depends(get
     # Zukunftige Buchungen sind immer erlaubt (Puffer-Logik prueft Uberschneidung)
     # Nur sofortige Buchungen pruefen ob Artikel verfuegbar ist
     now = datetime.utcnow()
-    is_future = data.date_from.replace(tzinfo=None) > now
+    is_future = _naive(data.date_from) > now
     if not is_future and not is_external and not item.is_available:
         raise HTTPException(400, "Gegenstand ist aktuell nicht verfuegbar - zukunftige Buchung moeglich")
 
