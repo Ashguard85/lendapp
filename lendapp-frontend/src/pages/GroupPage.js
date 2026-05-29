@@ -74,20 +74,30 @@ export default function GroupPage() {
   }
 
   function copyCode(code) {
-    navigator.clipboard.writeText(code).then(() => {
-      setSuccess("Code kopiert: " + code);
-      setTimeout(() => setSuccess(""), 3000);
-    }).catch(() => {
-      // Fallback fuer Browser ohne clipboard API
-      const el = document.createElement("textarea");
-      el.value = code;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand("copy");
-      document.body.removeChild(el);
-      setSuccess("Code kopiert: " + code);
-      setTimeout(() => setSuccess(""), 3000);
-    });
+    // Fallback fuer HTTP (kein HTTPS = kein clipboard API)
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(code).then(() => {
+          setSuccess("Code kopiert: " + code);
+          setTimeout(() => setSuccess(""), 3000);
+        });
+      } else {
+        const el = document.createElement("textarea");
+        el.value = code;
+        el.style.position = "fixed";
+        el.style.opacity = "0";
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+        setSuccess("Code kopiert: " + code);
+        setTimeout(() => setSuccess(""), 3000);
+      }
+    } catch (e) {
+      setSuccess("Code: " + code + " (bitte manuell kopieren)");
+      setTimeout(() => setSuccess(""), 6000);
+    }
   }
 
   const tabStyle = (t) => ({
@@ -157,20 +167,18 @@ export default function GroupPage() {
                       <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                         Einladungscode
                       </div>
-                      {detail ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg2)", borderRadius: 8, padding: "10px 14px" }}>
-                          <div style={{ flex: 1, fontWeight: 700, fontSize: 18, letterSpacing: "0.1em", fontFamily: "monospace", color: "var(--text)" }}>
-                            {detail.invite_code}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg2)", borderRadius: 8, padding: "10px 14px" }}>
+                          <div style={{ flex: 1, fontWeight: 700, fontSize: 18, letterSpacing: "0.1em", fontFamily: "monospace", color: detail ? "var(--text)" : "var(--text3)" }}>
+                            {detail ? detail.invite_code : "Ladt..."}
                           </div>
-                          <button
-                            className="btn btn-sm btn-primary"
-                            onClick={e => { e.stopPropagation(); copyCode(detail.invite_code); }}>
-                            Kopieren
-                          </button>
+                          {detail && detail.invite_code && (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={e => { e.stopPropagation(); e.preventDefault(); copyCode(detail.invite_code); }}>
+                              Kopieren
+                            </button>
+                          )}
                         </div>
-                      ) : (
-                        <div style={{ color: "var(--text3)", fontSize: 13 }}>Ladt...</div>
-                      )}
                     </div>
 
                     {/* Mitglieder */}
