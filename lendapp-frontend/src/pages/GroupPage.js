@@ -5,6 +5,7 @@ import * as api from "../api/client";
 export default function GroupPage() {
   const { user, groups, addGroup, removeGroup, logout } = useAuth();
   const [expandedGroup, setExpandedGroup] = useState(null);
+  const [groupDetails, setGroupDetails] = useState({});
   const [members, setMembers] = useState({});
   const [newName, setNewName] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -13,10 +14,14 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("list");
 
-  async function loadMembers(groupId) {
-    if (members[groupId]) return;
+  async function loadGroupDetails(groupId) {
+    if (groupDetails[groupId] && members[groupId]) return;
     try {
-      const m = await api.getMembers(groupId);
+      const [g, m] = await Promise.all([
+        api.getGroup(groupId),
+        api.getMembers(groupId),
+      ]);
+      setGroupDetails(prev => ({ ...prev, [groupId]: g }));
       setMembers(prev => ({ ...prev, [groupId]: m }));
     } catch (e) {}
   }
@@ -26,7 +31,7 @@ export default function GroupPage() {
       setExpandedGroup(null);
     } else {
       setExpandedGroup(id);
-      loadMembers(id);
+      loadGroupDetails(id);
     }
   }
 
@@ -36,9 +41,11 @@ export default function GroupPage() {
     try {
       const g = await api.createGroup({ name: newName }, user.user_id);
       addGroup({ id: g.id, name: g.name });
+      setGroupDetails(prev => ({ ...prev, [g.id]: g }));
       setNewName("");
-      setSuccess("Gruppe " + g.name + " erstellt! Code: " + g.invite_code);
+      setSuccess("Gruppe " + g.name + " erstellt!");
       setTab("list");
+      setExpandedGroup(g.id);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -66,10 +73,21 @@ export default function GroupPage() {
     } catch (e) { setError(e.message); }
   }
 
-  function copyInvite(group) {
-    navigator.clipboard.writeText(group.invite_code);
-    setSuccess("Code kopiert: " + group.invite_code);
-    setTimeout(() => setSuccess(""), 3000);
+  function copyCode(code) {
+    navigator.clipboard.writeText(code).then(() => {
+      setSuccess("Code kopiert: " + code);
+      setTimeout(() => setSuccess(""), 3000);
+    }).catch(() => {
+      // Fallback fuer Browser ohne clipboard API
+      const el = document.createElement("textarea");
+      el.value = code;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setSuccess("Code kopiert: " + code);
+      setTimeout(() => setSuccess(""), 3000);
+    });
   }
 
   const tabStyle = (t) => ({
@@ -110,67 +128,83 @@ export default function GroupPage() {
               <p style={{ fontSize: 14, color: "var(--text2)" }}>Du bist noch in keiner Gruppe. Erstelle eine oder tritt einer bei.</p>
             </div>
           )}
-          {groups.map(g => (
-            <div key={g.id} className="card" style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flex: 1 }}
+          {groups.map(g => {
+            const detail = groupDetails[g.id];
+            const groupMembers = members[g.id];
+            const isExpanded = expandedGroup === g.id;
+
+            return (
+              <div key={g.id} className="card" style={{ marginBottom: 12 }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }}
                   onClick={() => toggleGroup(g.id)}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--accent-mid)", flexShrink: 0 }} />
-                  <div>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--accent-mid)", marginRight: 10, flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 15 }}>{g.name}</div>
                     {g.is_admin && <span className="badge badge-green" style={{ fontSize: 10 }}>Admin</span>}
                   </div>
-                  <span style={{ marginLeft: "auto", color: "var(--text3)", fontSize: 12 }}>
-                    {expandedGroup === g.id ? "▲" : "▼"}
+                  <span style={{ color: "var(--text3)", fontSize: 12, marginLeft: 8 }}>
+                    {isExpanded ? "▲" : "▼"}
                   </span>
                 </div>
-              </div>
 
-              {expandedGroup === g.id && (
-                <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-                  {/* Einladungscode */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, background: "var(--bg2)", borderRadius: 8, padding: "8px 12px" }}>
-                    <div>
-                      <div style={{ fontSize: 11, color: "var(--text3)" }}>Einladungscode</div>
-                      <div style={{ fontWeight: 600, fontSize: 14, letterSpacing: "0.05em" }}>{g.invite_code}</div>
-                    </div>
-                    <button className="btn btn-sm btn-secondary" onClick={() => copyInvite(g)}>Kopieren</button>
-                  </div>
+                {/* Details */}
+                {isExpanded && (
+                  <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
 
-                  {/* Mitglieder */}
-                  {members[g.id] ? (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 8 }}>
-                        {members[g.id].length} Mitglied{members[g.id].length !== 1 ? "er" : ""}
+                    {/* Einladungscode */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        Einladungscode
                       </div>
-                      {members[g.id].map(m => (
+                      {detail ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--bg2)", borderRadius: 8, padding: "10px 14px" }}>
+                          <div style={{ flex: 1, fontWeight: 700, fontSize: 18, letterSpacing: "0.1em", fontFamily: "monospace", color: "var(--text)" }}>
+                            {detail.invite_code}
+                          </div>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={e => { e.stopPropagation(); copyCode(detail.invite_code); }}>
+                            Kopieren
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ color: "var(--text3)", fontSize: 13 }}>Ladt...</div>
+                      )}
+                    </div>
+
+                    {/* Mitglieder */}
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        Mitglieder {groupMembers ? "(" + groupMembers.length + ")" : ""}
+                      </div>
+                      {groupMembers ? groupMembers.map(m => (
                         <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
                           <div className="avatar" style={{ width: 28, height: 28, fontSize: 11 }}>
                             {m.name && m.name[0] ? m.name[0].toUpperCase() : "?"}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{m.name}</div>
-                          </div>
+                          <div style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{m.name}</div>
                           {m.is_admin && <span className="badge badge-green" style={{ fontSize: 10 }}>Admin</span>}
                           {m.user_id === user.user_id && <span className="badge badge-blue" style={{ fontSize: 10 }}>Du</span>}
                         </div>
-                      ))}
+                      )) : (
+                        <div style={{ color: "var(--text3)", fontSize: 13 }}>Ladt...</div>
+                      )}
                     </div>
-                  ) : (
-                    <div style={{ fontSize: 13, color: "var(--text3)", marginBottom: 12 }}>Ladt...</div>
-                  )}
 
-                  {/* Austreten */}
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleLeave(g)}
-                    style={{ width: "100%" }}>
-                    Gruppe verlassen
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
+                    {/* Austreten */}
+                    <button
+                      className="btn btn-danger btn-sm"
+                      style={{ width: "100%" }}
+                      onClick={e => { e.stopPropagation(); handleLeave(g); }}>
+                      Gruppe verlassen
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
           <div style={{ marginTop: 16 }}>
             <button className="btn btn-danger btn-sm" onClick={logout}>Ausloggen</button>
           </div>
@@ -182,7 +216,8 @@ export default function GroupPage() {
           <div style={{ fontWeight: 600, marginBottom: 14 }}>Neue Gruppe erstellen</div>
           <div className="form-group">
             <label className="form-label">Gruppenname</label>
-            <input className="form-input" placeholder="z.B. Familie Muller" value={newName} onChange={e => setNewName(e.target.value)} />
+            <input className="form-input" placeholder="z.B. Familie Muller" value={newName}
+              onChange={e => setNewName(e.target.value)} />
           </div>
           <button className="btn btn-primary btn-full" onClick={handleCreate} disabled={loading}>
             {loading ? "..." : "Gruppe erstellen"}
@@ -195,7 +230,8 @@ export default function GroupPage() {
           <div style={{ fontWeight: 600, marginBottom: 14 }}>Gruppe beitreten</div>
           <div className="form-group">
             <label className="form-label">Einladungscode</label>
-            <input className="form-input" placeholder="z.B. abc12345" value={joinCode} onChange={e => setJoinCode(e.target.value)} />
+            <input className="form-input" placeholder="z.B. abc12345" value={joinCode}
+              onChange={e => setJoinCode(e.target.value)} />
           </div>
           <p style={{ fontSize: 12, color: "var(--text3)", marginBottom: 12 }}>
             Den Code bekommst du vom Gruppenadmin.
