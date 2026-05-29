@@ -1,24 +1,10 @@
-# Stage 1: Build
+# Stage 1: Build mit Vite
 FROM node:18-alpine AS builder
 WORKDIR /app
-
-# Dependencies separat für besseres Caching
 COPY package.json ./
-RUN npm install --legacy-peer-deps --prefer-offline
-
-# Quellcode kopieren
+RUN npm install
 COPY . .
-
-# Build-Umgebung
-ENV NODE_OPTIONS="--max-old-space-size=2048"
-ENV CI=false
-ENV GENERATE_SOURCEMAP=false
-ENV DISABLE_ESLINT_PLUGIN=true
-ENV TSC_COMPILE_ON_ERROR=true
-ENV SKIP_PREFLIGHT_CHECK=true
-
-# Build mit vollem Output damit Fehler sichtbar sind
-RUN npm run build || (echo "BUILD FAILED" && cat /tmp/npm-*.log 2>/dev/null && exit 1)
+RUN npm run build
 
 # Stage 2: nginx
 FROM nginx:alpine
