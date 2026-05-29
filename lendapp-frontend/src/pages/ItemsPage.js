@@ -122,13 +122,43 @@ function ItemModal({ item, onClose, onSaved, groupId, userId }) {
   );
 }
 
-function BookingModal({ item, userId, onClose, onBooked }) {
-  const today = new Date().toISOString().slice(0, 10);
-  const [from, setFrom] = useState(today);
+function BookingModal({ item, userId, onClose, onBooked, bookings }) {
+  // Fruhesten buchbaren Termin berechnen
+  function getEarliestFrom() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!item.is_available && bookings) {
+      // Aktive Buchung finden
+      const active = bookings.find(b => b.status === "approved" || b.status === "external");
+      if (active && active.date_to) {
+        const nextFree = new Date(active.date_to);
+        nextFree.setDate(nextFree.getDate() + 1); // +1 Tag Puffer
+        nextFree.setHours(0, 0, 0, 0);
+        return nextFree > today ? nextFree : today;
+      }
+    }
+    return today;
+  }
+
+  function toDateStr(d) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  function getMaxTo(fromStr) {
+    if (!fromStr || !item.max_days) return "";
+    const d = new Date(fromStr);
+    d.setDate(d.getDate() + item.max_days);
+    return toDateStr(d);
+  }
+
+  const earliest = getEarliestFrom();
+  const [from, setFrom] = useState(toDateStr(earliest));
   const [to, setTo] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const maxTo = getMaxTo(from);
 
   async function handleBook() {
     if (!to) return setError("Bitte Enddatum wahlen");
@@ -140,15 +170,28 @@ function BookingModal({ item, userId, onClose, onBooked }) {
     finally { setLoading(false); }
   }
 
+  const minFrom = toDateStr(earliest);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">{item.name} anfragen</div>
+        {!item.is_available && (
+          <div style={{ background: "var(--accent-light)", color: "var(--accent)", borderRadius: 8, padding: "6px 12px", fontSize: 12, marginBottom: 12 }}>
+            Fruhestens buchbar ab {minFrom}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}><label className="form-label">Von</label>
-            <input className="form-input" type="date" value={from} min={today} onChange={e => setFrom(e.target.value)} /></div>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}><label className="form-label">Bis</label>
-            <input className="form-input" type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></div>
+          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label className="form-label">Von</label>
+            <input className="form-input" type="date" value={from} min={minFrom}
+              onChange={e => { setFrom(e.target.value); setTo(""); }} />
+          </div>
+          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label className="form-label">Bis (max. {item.max_days}d)</label>
+            <input className="form-input" type="date" value={to} min={from} max={maxTo}
+              onChange={e => setTo(e.target.value)} />
+          </div>
         </div>
         <div className="form-group"><label className="form-label">Notiz (optional)</label>
           <input className="form-input" placeholder="Kurze Nachricht..." value={note} onChange={e => setNote(e.target.value)} /></div>
@@ -330,7 +373,7 @@ export function ItemDetailPage() {
           </div>
         </div>
       </div>
-      {showBook && <BookingModal item={item} userId={user.user_id} onClose={() => setShowBook(false)} onBooked={() => { setShowBook(false); load(); }} />}
+      {showBook && <BookingModal item={item} userId={user.user_id} bookings={bookings} onClose={() => setShowBook(false)} onBooked={() => { setShowBook(false); load(); }} />}
       {showEdit && <ItemModal item={item} userId={user.user_id} groupId={item.group_id} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); load(); }} />}
       {showExternal && <ExternalBookingModal item={item} userId={user.user_id} onClose={() => setShowExternal(false)} onBooked={() => { setShowExternal(false); load(); }} />}
     </div>
