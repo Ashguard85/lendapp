@@ -131,8 +131,9 @@ function BookingModal({ item, userId, onClose, onBooked, bookings }) {
       // Aktive Buchung finden
       const active = bookings.find(b => b.status === "approved" || b.status === "external");
       if (active && active.date_to) {
-        const nextFree = new Date(active.date_to);
-        nextFree.setDate(nextFree.getDate() + 1); // +1 Tag Puffer
+        // Datum sauber parsen ohne Timezone-Versatz
+        const dtParts = active.date_to.slice(0, 10).split("-");
+        const nextFree = new Date(parseInt(dtParts[0]), parseInt(dtParts[1]) - 1, parseInt(dtParts[2]) + 1);
         nextFree.setHours(0, 0, 0, 0);
         return nextFree > today ? nextFree : today;
       }
@@ -178,7 +179,7 @@ function BookingModal({ item, userId, onClose, onBooked, bookings }) {
         <div className="modal-title">{item.name} anfragen</div>
         {!item.is_available && (
           <div style={{ background: "var(--accent-light)", color: "var(--accent)", borderRadius: 8, padding: "6px 12px", fontSize: 12, marginBottom: 12 }}>
-            Fruhestens buchbar ab {minFrom}
+            Fruhestens buchbar ab {new Date(minFrom).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}
           </div>
         )}
         <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
@@ -326,7 +327,11 @@ export function ItemDetailPage() {
             )}
             {!item.is_available && activeBooking && activeBooking.date_to && (
               <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)", background: "var(--accent-light)", borderRadius: 8, padding: "4px 10px", display: "inline-block" }}>
-                Fruhestens buchbar ab {fmt(new Date(new Date(activeBooking.date_to).getTime() + 86400000))}
+                {(() => {
+                  const p = activeBooking.date_to.slice(0, 10).split("-");
+                  const next = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]) + 1);
+                  return "Fruhestens buchbar ab " + next.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
+                })()}
               </div>
             )}
             {item.description && <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>{item.description}</p>}
