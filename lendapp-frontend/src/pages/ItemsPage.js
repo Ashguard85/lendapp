@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { CATEGORY_EMOJI } from "../components/Sidebar";
 import * as api from "../api/client";
+import BookingCalendar from "../components/BookingCalendar";
 
 const CATEGORIES = ["Werkzeug", "Sport", "Haushalt", "Elektronik", "Sonstiges"];
 
@@ -123,82 +124,85 @@ function ItemModal({ item, onClose, onSaved, groupId, userId }) {
 }
 
 function BookingModal({ item, userId, onClose, onBooked, bookings }) {
-  // Fruhesten buchbaren Termin berechnen
   function getEarliestFrom() {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = new Date(); today.setHours(0,0,0,0);
     if (!item.is_available && bookings) {
-      // Aktive Buchung finden
       const active = bookings.find(b => b.status === "approved" || b.status === "external");
       if (active && active.date_to) {
-        // Datum sauber parsen ohne Timezone-Versatz
-        const dtParts = active.date_to.slice(0, 10).split("-");
-        const nextFree = new Date(parseInt(dtParts[0]), parseInt(dtParts[1]) - 1, parseInt(dtParts[2]) + 1);
-        nextFree.setHours(0, 0, 0, 0);
-        return nextFree > today ? nextFree : today;
+        const p = active.date_to.slice(0, 10).split("-");
+        const next = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]) + 1);
+        next.setHours(0,0,0,0);
+        return next > today ? next : today;
       }
     }
     return today;
   }
 
-  function toDateStr(d) {
-    return d.toISOString().slice(0, 10);
-  }
-
-  function getMaxTo(fromStr) {
-    if (!fromStr || !item.max_days) return "";
-    const d = new Date(fromStr);
-    d.setDate(d.getDate() + item.max_days);
-    return toDateStr(d);
+  function toStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return y+"-"+m+"-"+dd;
   }
 
   const earliest = getEarliestFrom();
-  const [from, setFrom] = useState(toDateStr(earliest));
-  const [to, setTo] = useState("");
+  const minFrom = toStr(earliest);
+  const [selected, setSelected] = useState({ from: minFrom, to: "" });
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const maxTo = getMaxTo(from);
+  // Gesperrte Zeitraeume aus vorhandenen Buchungen berechnen
+  const blockedRanges = (bookings || [])
+    .filter(b => b.status === "approved" || b.status === "external")
+    .map(b => {
+      if (!b.date_from) return null;
+      const fromP = b.date_from.slice(0,10).split("-");
+      const fromD = new Date(parseInt(fromP[0]), parseInt(fromP[1])-1, parseInt(fromP[2])-1);
+      if (!b.date_to) return { from: toStr(fromD), to: null, open: true };
+      const toP = b.date_to.slice(0,10).split("-");
+      const toD = new Date(parseInt(toP[0]), parseInt(toP[1])-1, parseInt(toP[2])+1);
+      return { from: toStr(fromD), to: toStr(toD), open: false };
+    }).filter(Boolean);
 
   async function handleBook() {
-    if (!to) return setError("Bitte Enddatum wahlen");
+    if (!selected.from || !selected.to) return setError("Bitte Von- und Bis-Datum waehlen");
     setLoading(true);
     try {
-      await api.requestBooking({ item_id: item.id, date_from: new Date(from).toISOString(), date_to: new Date(to).toISOString(), note }, userId);
+      const p1 = selected.from.split("-");
+      const p2 = selected.to.split("-");
+      const dateFrom = new Date(parseInt(p1[0]), parseInt(p1[1])-1, parseInt(p1[2]));
+      const dateTo   = new Date(parseInt(p2[0]), parseInt(p2[1])-1, parseInt(p2[2]));
+      await api.requestBooking({ item_id: item.id, date_from: dateFrom.toISOString(), date_to: dateTo.toISOString(), note }, userId);
       onBooked();
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
 
-  const minFrom = toDateStr(earliest);
-
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">{item.name} anfragen</div>
-        {!item.is_available && (
-          <div style={{ background: "var(--accent-light)", color: "var(--accent)", borderRadius: 8, padding: "6px 12px", fontSize: 12, marginBottom: 12 }}>
-            Fruhestens buchbar ab {new Date(minFrom).toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" })}
-          </div>
-        )}
-        <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label className="form-label">Von</label>
-            <input className="form-input" type="date" value={from} min={minFrom}
-              onChange={e => { setFrom(e.target.value); setTo(""); }} />
-          </div>
-          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-            <label className="form-label">Bis (max. {item.max_days}d)</label>
-            <input className="form-input" type="date" value={to} min={from} max={maxTo}
-              onChange={e => setTo(e.target.value)} />
-          </div>
+        <p style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10 }}>
+          Klick auf Startdatum, dann Enddatum waehlen.
+        </p>
+        <BookingCalendar
+          blockedRanges={blockedRanges}
+          minDate={minFrom}
+          maxDays={item.max_days}
+          selectedFrom={selected.from}
+          selectedTo={selected.to}
+          onSelect={s => { setSelected(s); setError(""); }}
+        />
+        <div className="form-group" style={{ marginTop: 12 }}>
+          <label className="form-label">Notiz (optional)</label>
+          <input className="form-input" placeholder="Kurze Nachricht..." value={note} onChange={e => setNote(e.target.value)} />
         </div>
-        <div className="form-group"><label className="form-label">Notiz (optional)</label>
-          <input className="form-input" placeholder="Kurze Nachricht..." value={note} onChange={e => setNote(e.target.value)} /></div>
         {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
-        <div style={{ display: "flex", gap: 10 }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleBook} disabled={loading}>{loading ? "..." : "Anfrage senden"}</button>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleBook} disabled={loading || !selected.from || !selected.to}>
+            {loading ? "..." : "Anfrage senden"}
+          </button>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         </div>
       </div>
