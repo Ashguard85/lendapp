@@ -123,12 +123,8 @@ def request_booking(data: BookingCreate, user_id: int, db: Session = Depends(get
     if data.date_to and data.date_from >= data.date_to:
         raise HTTPException(400, "Enddatum muss nach Startdatum liegen")
 
-    # Zukunftige Buchungen sind immer erlaubt (Puffer-Logik prueft Uberschneidung)
-    # Nur sofortige Buchungen pruefen ob Artikel verfuegbar ist
-    now = datetime.utcnow()
-    is_future = _naive(data.date_from) > now
-    if not is_future and not is_external and not item.is_available:
-        raise HTTPException(400, "Gegenstand ist aktuell nicht verfuegbar - zukunftige Buchung moeglich")
+    # Verfuegbarkeit wird nur durch _check_overlap geprueft
+    # Buchungen vor oder nach bestehenden Buchungen sind immer erlaubt
 
     # Max-Tage nur bei normalen Buchungen
     if not is_external and data.date_to:

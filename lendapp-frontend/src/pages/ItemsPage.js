@@ -125,20 +125,6 @@ function ItemModal({ item, onClose, onSaved, groupId, userId }) {
 }
 
 function BookingModal({ item, userId, onClose, onBooked, bookings }) {
-  function getEarliestFrom() {
-    const today = new Date(); today.setHours(0,0,0,0);
-    if (!item.is_available && bookings) {
-      const active = bookings.find(b => b.status === "approved" || b.status === "external");
-      if (active && active.date_to) {
-        const p = active.date_to.slice(0, 10).split("-");
-        const next = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]) + 1);
-        next.setHours(0,0,0,0);
-        return next > today ? next : today;
-      }
-    }
-    return today;
-  }
-
   function toStr(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth()+1).padStart(2,"0");
@@ -146,8 +132,9 @@ function BookingModal({ item, userId, onClose, onBooked, bookings }) {
     return y+"-"+m+"-"+dd;
   }
 
-  const earliest = getEarliestFrom();
-  const minFrom = toStr(earliest);
+  // Immer ab heute buchbar - gesperrte Zeitraeume zeigt der Kalender selbst
+  const today = new Date(); today.setHours(0,0,0,0);
+  const minFrom = toStr(today);
   const [selected, setSelected] = useState({ from: "", to: "" });
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
@@ -211,24 +198,54 @@ function BookingModal({ item, userId, onClose, onBooked, bookings }) {
   );
 }
 
-function ExternalBookingModal({ item, userId, onClose, onBooked }) {
-  const today = new Date().toISOString().slice(0, 10);
+function ExternalBookingModal({ item, userId, onClose, onBooked, bookings }) {
   const [name, setName] = useState("");
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState("");
+  const [selected, setSelected] = useState({ from: "", to: "" });
   const [noEnd, setNoEnd] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  function toStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return y+"-"+m+"-"+dd;
+  }
+
+  const today = toStr(new Date());
+  // Immer ab heute - gesperrte Zeitraeume zeigt Kalender
+
+  // Gesperrte Zeitraeume aus bestehenden Buchungen
+  const blockedRanges = (bookings || [])
+    .filter(b => b.status === "approved" || b.status === "external")
+    .map(b => {
+      if (!b.date_from) return null;
+      const fromP = b.date_from.slice(0,10).split("-");
+      const fromD = new Date(parseInt(fromP[0]), parseInt(fromP[1])-1, parseInt(fromP[2])-1);
+      if (!b.date_to) return { from: toStr(fromD), to: null, open: true };
+      const toP = b.date_to.slice(0,10).split("-");
+      const toD = new Date(parseInt(toP[0]), parseInt(toP[1])-1, parseInt(toP[2])+1);
+      return { from: toStr(fromD), to: toStr(toD), open: false };
+    }).filter(Boolean);
+
   async function handleSave() {
     if (!name.trim()) return setError("Bitte Name / Grund eingeben");
+    if (!selected.from) return setError("Bitte Startdatum waehlen");
+    if (!noEnd && !selected.to) return setError("Bitte Enddatum waehlen oder Kein Enddatum aktivieren");
     setLoading(true);
     try {
+      const p1 = selected.from.split("-");
+      const dateFrom = new Date(parseInt(p1[0]), parseInt(p1[1])-1, parseInt(p1[2]));
+      let dateTo = null;
+      if (!noEnd && selected.to) {
+        const p2 = selected.to.split("-");
+        dateTo = new Date(parseInt(p2[0]), parseInt(p2[1])-1, parseInt(p2[2]));
+      }
       await api.requestBooking({
         item_id: item.id,
-        date_from: new Date(from).toISOString(),
-        date_to: noEnd ? null : (to ? new Date(to).toISOString() : null),
+        date_from: dateFrom.toISOString(),
+        date_to: dateTo ? dateTo.toISOString() : null,
         note,
         external_name: name,
       }, userId);
@@ -239,24 +256,40 @@ function ExternalBookingModal({ item, userId, onClose, onBooked }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">Extern / Eigenbedarf</div>
-        <div className="form-group"><label className="form-label">Person / Grund</label>
-          <input className="form-input" placeholder="z.B. Urs oder Eigenbedarf" value={name} onChange={e => setName(e.target.value)} /></div>
-        <div className="form-group"><label className="form-label">Ab</label>
-          <input className="form-input" type="date" value={from} onChange={e => setFrom(e.target.value)} /></div>
         <div className="form-group">
-          <label className="form-label">Bis (optional)</label>
-          <input className="form-input" type="date" value={to} min={from} disabled={noEnd} onChange={e => setTo(e.target.value)} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
-            <input type="checkbox" id="noend" checked={noEnd} onChange={e => { setNoEnd(e.target.checked); if (e.target.checked) setTo(""); }} />
-            <label htmlFor="noend" style={{ fontSize: 13, color: "var(--text2)" }}>Kein Enddatum</label>
-          </div>
+          <label className="form-label">Person / Grund</label>
+          <input className="form-input" placeholder="z.B. Urs oder Eigenbedarf" value={name} onChange={e => setName(e.target.value)} />
         </div>
-        <div className="form-group"><label className="form-label">Notiz</label>
-          <input className="form-input" placeholder="Weitere Infos..." value={note} onChange={e => setNote(e.target.value)} /></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <input type="checkbox" id="noend2" checked={noEnd} onChange={e => { setNoEnd(e.target.checked); if (e.target.checked) setSelected(s => ({ ...s, to: "" })); }} />
+          <label htmlFor="noend2" style={{ fontSize: 13, color: "var(--text2)" }}>Kein Enddatum (offen)</label>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--text3)", marginBottom: 10 }}>
+          {noEnd ? "Startdatum waehlen." : "Startdatum dann Enddatum waehlen."}
+        </p>
+        <BookingCalendar
+          blockedRanges={blockedRanges}
+          minDate={today}
+          maxDays={noEnd ? null : item.max_days}
+          selectedFrom={selected.from}
+          selectedTo={noEnd ? selected.from : selected.to}
+          onSelect={s => {
+            if (noEnd) {
+              setSelected({ from: s.from, to: s.from });
+            } else {
+              setSelected(s);
+            }
+            setError("");
+          }}
+        />
+        <div className="form-group" style={{ marginTop: 12 }}>
+          <label className="form-label">Notiz (optional)</label>
+          <input className="form-input" placeholder="Weitere Infos..." value={note} onChange={e => setNote(e.target.value)} />
+        </div>
         {error && <div style={{ color: "var(--warn)", fontSize: 13, marginBottom: 12 }}>{error}</div>}
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
           <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave} disabled={loading}>{loading ? "..." : "Erfassen"}</button>
           <button className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
         </div>
@@ -391,7 +424,7 @@ export function ItemDetailPage() {
       </div>
       {showBook && <BookingModal item={item} userId={user.user_id} bookings={bookings} onClose={() => setShowBook(false)} onBooked={() => { setShowBook(false); load(); }} />}
       {showEdit && <ItemModal item={item} userId={user.user_id} groupId={item.group_id} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); load(); }} />}
-      {showExternal && <ExternalBookingModal item={item} userId={user.user_id} onClose={() => setShowExternal(false)} onBooked={() => { setShowExternal(false); load(); }} />}
+      {showExternal && <ExternalBookingModal item={item} userId={user.user_id} bookings={bookings} onClose={() => setShowExternal(false)} onBooked={() => { setShowExternal(false); load(); }} />}
     </div>
   );
 }
