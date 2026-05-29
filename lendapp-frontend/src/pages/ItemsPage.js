@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { CATEGORY_EMOJI } from "../components/Sidebar";
 import * as api from "../api/client";
 import BookingCalendar from "../components/BookingCalendar";
+import BookingOverview from "../components/BookingOverview";
 
 const CATEGORIES = ["Werkzeug", "Sport", "Haushalt", "Elektronik", "Sonstiges"];
 
@@ -347,14 +348,20 @@ export function ItemDetailPage() {
               {item.is_available ? "Jetzt anfragen" : "Zukunftige Buchung anfragen"}
             </button>
           )}
-          {isOwner && item.is_available && (
-            <button className="btn btn-secondary btn-full" onClick={() => setShowExternal(true)}>Extern / Eigenbedarf</button>
+          {isOwner && (
+            <button className="btn btn-secondary btn-full" style={{ marginTop: 8 }} onClick={() => setShowExternal(true)}>Extern / Eigenbedarf</button>
           )}
           {isOwner && !item.is_available && activeBooking && (
             <button className="btn btn-secondary btn-full" onClick={() => handleStatus(activeBooking.id, "returned")}>Als zuruckgegeben markieren</button>
           )}
         </div>
         <div style={{ flex: 1, minWidth: 260 }}>
+          {isOwner && bookings.length > 0 && (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, marginBottom: 12 }}>Belegungskalender</div>
+              <BookingOverview bookings={bookings} />
+            </div>
+          )}
           <div className="card">
             <div style={{ fontWeight: 600, marginBottom: 14 }}>Buchungshistorie</div>
             {bookings.length === 0 && <div style={{ color: "var(--text3)", fontSize: 13 }}>Noch keine Buchungen.</div>}
