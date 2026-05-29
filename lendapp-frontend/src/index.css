@@ -192,7 +192,9 @@ select.form-input { cursor: pointer; }
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .bottom-nav { display: flex; }
-  .main { padding: 16px 16px 90px; }
+  .main { padding: 16px 12px 90px; overflow-x: hidden; }
+  body { overflow-x: hidden; }
+  .layout { overflow-x: hidden; }
 }
 
 /* iOS Zoom Fix - alle Inputs mind. 16px */

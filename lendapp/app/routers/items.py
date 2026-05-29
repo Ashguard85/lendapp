@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from typing import List, Optional
 from app.database import get_db
-from app.models.models import Item, GroupMember
+from app.models.models import Item, GroupMember, User
 from app.schemas.schemas import ItemCreate, ItemUpdate, ItemOut
 
 router = APIRouter()
@@ -16,6 +16,7 @@ def _check_member(db, group_id, user_id):
 
 @router.post("/", response_model=ItemOut, status_code=201)
 def create_item(data: ItemCreate, user_id: int, db: Session = Depends(get_db)):
+    # Sicherstellen dass user_id in der angegebenen Gruppe ist
     _check_member(db, data.group_id, user_id)
     item = Item(**data.model_dump(), owner_id=user_id)
     db.add(item)
@@ -32,9 +33,26 @@ def list_items(
     available_only: bool = False,
     db: Session = Depends(get_db),
 ):
+    # Pruefen ob User Mitglied ist
     _check_member(db, group_id, user_id)
-    # Soft delete: nur nicht gelöschte Items
-    q = db.query(Item).filter(Item.group_id == group_id, Item.deleted_at == None)
+
+    # Alle Mitglieder der Gruppe holen (nur aktive, nicht geloeschte User)
+    members = (
+        db.query(GroupMember)
+        .join(User, GroupMember.user_id == User.id)
+        .filter(
+            GroupMember.group_id == group_id,
+            User.deleted_at == None,
+            User.is_active == True,
+        ).all()
+    )
+    member_ids = [m.user_id for m in members]
+
+    # Items aller Mitglieder zeigen - nicht nach group_id filtern
+    q = db.query(Item).filter(
+        Item.owner_id.in_(member_ids),
+        Item.deleted_at == None,
+    )
     if category:
         q = q.filter(Item.category == category)
     if available_only:
@@ -70,8 +88,7 @@ def delete_item(item_id: int, user_id: int, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
     if item.owner_id != user_id:
-        raise HTTPException(403, "Nur der Besitzer darf löschen")
-    # Soft delete – Buchungshistorie bleibt erhalten
+        raise HTTPException(403, "Nur der Besitzer darf loeschen")
     item.deleted_at = func.now()
     item.is_available = False
     db.commit()

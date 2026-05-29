@@ -70,7 +70,7 @@ function ImageField({ currentUrl, onUploaded, onDeleted }) {
   );
 }
 
-function ItemModal({ item, onClose, onSaved, groupId, userId }) {
+function ItemModal({ item, onClose, onSaved, groupId, groupIds, userId }) {
   const isEdit = !!item;
   const [form, setForm] = useState({
     name: isEdit ? item.name : "",
@@ -91,6 +91,7 @@ function ItemModal({ item, onClose, onSaved, groupId, userId }) {
       if (isEdit) {
         await api.updateItem(item.id, { ...form, max_days: Number(form.max_days), image_url: imageUrl, thumb_url: thumbUrl }, userId);
       } else {
+        // Artikel einmal erstellen - sichtbar fuer alle Gruppenmitglieder
         await api.createItem({ ...form, max_days: Number(form.max_days), image_url: imageUrl, thumb_url: thumbUrl }, userId);
       }
       onSaved();
@@ -469,15 +470,7 @@ export default function ItemsPage() {
           <div className="page-sub">{items.length} Gegenstande in {groups.length} Gruppe{groups.length !== 1 ? "n" : ""}</div>
         </div>
         {groups.length > 0 && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {groups.length > 1 && (
-              <select className="form-input" style={{ fontSize: 13, padding: "6px 10px", width: "auto" }}
-                value={activeGroupId || ""} onChange={e => setActiveGroupId(Number(e.target.value))}>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            )}
-            <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Erfassen</button>
-          </div>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ Erfassen</button>
         )}
       </div>
       <div className="chip-row" style={{ marginBottom: 20 }}>
@@ -519,7 +512,8 @@ export default function ItemsPage() {
       )}
       {showAdd && (
         <ItemModal
-          groupId={activeGroupId || (groups[0] && groups[0].id)}
+          groupId={groups[0] && groups[0].id}
+          groupIds={groups.map(g => g.id)}
           userId={user.user_id}
           onClose={() => setShowAdd(false)}
           onSaved={() => { setShowAdd(false); load(); }} />
