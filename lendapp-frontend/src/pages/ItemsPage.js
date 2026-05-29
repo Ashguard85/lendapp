@@ -272,7 +272,7 @@ function ExternalBookingModal({ item, userId, onClose, onBooked, bookings }) {
         <BookingCalendar
           blockedRanges={blockedRanges}
           minDate={today}
-          maxDays={noEnd ? null : item.max_days}
+          maxDays={null}
           selectedFrom={selected.from}
           selectedTo={noEnd ? selected.from : selected.to}
           onSelect={s => {
