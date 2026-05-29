@@ -281,12 +281,19 @@ export function ItemDetailPage() {
                 {activeBooking.date_to ? (" bis " + fmt(activeBooking.date_to)) : " (offen)"}
               </div>
             )}
+            {!item.is_available && activeBooking && activeBooking.date_to && (
+              <div style={{ marginTop: 4, fontSize: 12, color: "var(--accent)", background: "var(--accent-light)", borderRadius: 8, padding: "4px 10px", display: "inline-block" }}>
+                Fruhestens buchbar ab {fmt(new Date(new Date(activeBooking.date_to).getTime() + 86400000))}
+              </div>
+            )}
             {item.description && <p style={{ marginTop: 14, fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>{item.description}</p>}
             <div className="divider" />
             <div style={{ fontSize: 13, color: "var(--text2)" }}>Max. <strong>{item.max_days}</strong> Tage</div>
           </div>
-          {!isOwner && item.is_available && (
-            <button className="btn btn-primary btn-full" style={{ marginBottom: 8 }} onClick={() => setShowBook(true)}>Jetzt anfragen</button>
+          {!isOwner && (
+            <button className="btn btn-primary btn-full" style={{ marginBottom: 8 }} onClick={() => setShowBook(true)}>
+              {item.is_available ? "Jetzt anfragen" : "Zukunftige Buchung anfragen"}
+            </button>
           )}
           {isOwner && item.is_available && (
             <button className="btn btn-secondary btn-full" onClick={() => setShowExternal(true)}>Extern / Eigenbedarf</button>
