@@ -7,7 +7,7 @@ export default function AdminLayout({ children }) {
   const { pathname } = useLocation();
 
   if (!user?.is_admin) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+    <div style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
       <div className="card" style={{ maxWidth: 360, textAlign: "center" }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Kein Zugriff</div>
@@ -27,7 +27,7 @@ export default function AdminLayout({ children }) {
   return (
     <div style={{ display: "flex", minHeight: "80vh", background: "var(--bg)" }}>
       {/* Admin Sidebar */}
-      <div style={{ width: 200, minWidth: 200, background: "#1C1A16", display: "flex", flexDirection: "column", padding: "24px 14px", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
+      <div style={{ width: 200, minWidth: 200, background: "#1C1A16", display: "flex", flexDirection: "column", padding: "24px 14px", flexShrink: 0, position: "sticky", top: 0, height: "80vh" }}>
         <div style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
           <span>⚙️</span> Admin
         </div>
