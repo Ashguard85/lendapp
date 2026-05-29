@@ -346,7 +346,10 @@ export function ItemDetailPage() {
         <div style={{ flex: 1, minWidth: 260 }}>
           <div className="card" style={{ marginBottom: 16 }}>
             {item.image_url ? (
-              <img src={item.image_url} alt={item.name} style={{ width: "100%", height: 180, objectFit: "cover", borderRadius: 10, marginBottom: 14 }} />
+              <div style={{ width: "100%", height: 200, borderRadius: 10, overflow: "hidden", position: "relative", background: "#000", marginBottom: 14 }}>
+                <img src={item.image_url} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(14px)", transform: "scale(1.1)", opacity: 0.7 }} />
+                <img src={item.image_url} alt={item.name} style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", zIndex: 1 }} />
+              </div>
             ) : (
               <div style={{ fontSize: 48, width: "100%", height: 100, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg2)", borderRadius: 10, marginBottom: 14 }}>
                 {CATEGORY_EMOJI[item.category] || "📦"}
@@ -487,7 +490,10 @@ export default function ItemsPage() {
           {filtered.map(item => (
             <div key={item.id} className="item-card" onClick={() => navigate("/items/" + item.id)}>
               {item.thumb_url ? (
-                <img src={item.thumb_url} alt={item.name} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 10 }} />
+                <div style={{ width: "100%", height: 120, borderRadius: 10, overflow: "hidden", position: "relative", background: "#000" }}>
+                  <img src={item.thumb_url} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(12px)", transform: "scale(1.1)", opacity: 0.7 }} />
+                  <img src={item.thumb_url} alt={item.name} style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", zIndex: 1 }} />
+                </div>
               ) : (
                 <div className="item-emoji">{CATEGORY_EMOJI[item.category] || "📦"}</div>
               )}

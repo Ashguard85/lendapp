@@ -141,7 +141,10 @@ export default function HomePage() {
           {items.slice(0, 6).map(item => (
             <div key={item.id} className="item-card" onClick={() => navigate("/items/" + item.id)}>
               {item.thumb_url ? (
-                <img src={item.thumb_url} alt={item.name} style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 8 }} />
+                <div style={{ width: "100%", height: 100, borderRadius: 8, overflow: "hidden", position: "relative", background: "#000" }}>
+                  <img src={item.thumb_url} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(12px)", transform: "scale(1.1)", opacity: 0.7 }} />
+                  <img src={item.thumb_url} alt={item.name} style={{ position: "relative", width: "100%", height: "100%", objectFit: "contain", zIndex: 1 }} />
+                </div>
               ) : (
                 <div className="item-emoji">{CATEGORY_EMOJI[item.category] || "📦"}</div>
               )}
