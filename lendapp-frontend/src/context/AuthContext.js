@@ -40,8 +40,14 @@ export function AuthProvider({ children }) {
     setGroups(updated);
   }
 
+  function removeGroup(id) {
+    const updated = groups.filter(g => g.id !== id);
+    localStorage.setItem('lendapp_groups', JSON.stringify(updated));
+    setGroups(updated);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, groups, groupId, groupIds, login, logout, addGroup, setGroup }}>
+    <AuthContext.Provider value={{ user, groups, groupId, groupIds, login, logout, addGroup, setGroup, removeGroup }}>
       {children}
     </AuthContext.Provider>
   );

@@ -492,7 +492,7 @@ export default function ItemsPage() {
               )}
               <div>
                 <div className="item-name">{item.name}</div>
-                <div className="item-meta">{item.category} - {item._groupName}</div>
+                <div className="item-meta">{item.category}</div>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className={"badge " + (item.is_available ? "badge-green" : "badge-orange")}>

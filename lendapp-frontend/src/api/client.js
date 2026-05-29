@@ -27,7 +27,8 @@ export const login = (email, password) => req("POST", "/users/login", { email, p
 // Groups
 export const createGroup = (data, uid) => req("POST", `/groups/?user_id=${uid}`, data, uid);
 export const getGroup = (id) => req("GET", `/groups/${id}`);
-export const joinGroup = (id, code, uid) => req("POST", `/groups/${id}/join?invite_code=${code}&user_id=${uid}`, {}, uid);
+export const joinGroup = (code, uid) => req("POST", `/groups/join?invite_code=${code}&user_id=${uid}`, {}, uid);
+export const leaveGroup = (id, uid) => req("DELETE", `/groups/${id}/leave?user_id=${uid}`, undefined, uid);
 export const getMembers = (id) => req("GET", `/groups/${id}/members`);
 
 // Items

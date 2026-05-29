@@ -29,21 +29,36 @@ def get_group(group_id: int, db: Session = Depends(get_db)):
     return group
 
 
-@router.post("/{group_id}/join")
-def join_group(group_id: int, invite_code: str, user_id: int, db: Session = Depends(get_db)):
+@router.post("/join")
+def join_group(invite_code: str, user_id: int, db: Session = Depends(get_db)):
+    """Beitritt nur per Code – keine ID noetig."""
     group = db.query(Group).filter(
-        Group.id == group_id,
         Group.invite_code == invite_code,
         Group.deleted_at == None,
     ).first()
     if not group:
-        raise HTTPException(404, "Ungültiger Einladungslink")
-    already = db.query(GroupMember).filter_by(group_id=group_id, user_id=user_id).first()
+        raise HTTPException(404, "Ungueltiger Einladungscode")
+    already = db.query(GroupMember).filter_by(group_id=group.id, user_id=user_id).first()
     if already:
         raise HTTPException(400, "Bereits Mitglied")
-    db.add(GroupMember(group_id=group_id, user_id=user_id))
+    db.add(GroupMember(group_id=group.id, user_id=user_id))
     db.commit()
-    return {"message": f"Willkommen in Gruppe '{group.name}'!", "group_id": group.id, "group_name": group.name}
+    return {"message": "Willkommen in " + group.name + "!", "group_id": group.id, "group_name": group.name}
+
+
+@router.delete("/{group_id}/leave", status_code=204)
+def leave_group(group_id: int, user_id: int, db: Session = Depends(get_db)):
+    """Aus einer Gruppe austreten."""
+    member = db.query(GroupMember).filter_by(group_id=group_id, user_id=user_id).first()
+    if not member:
+        raise HTTPException(404, "Nicht Mitglied dieser Gruppe")
+    # Letzter Admin darf nicht austreten
+    if member.is_admin:
+        admins = db.query(GroupMember).filter_by(group_id=group_id, is_admin=True).count()
+        if admins <= 1:
+            raise HTTPException(400, "Du bist der letzte Admin. Bitte zuerst jemand anderen zum Admin machen.")
+    db.delete(member)
+    db.commit()
 
 
 @router.get("/{group_id}/members")
@@ -62,7 +77,6 @@ def list_members(group_id: int, db: Session = Depends(get_db)):
 
 @router.get("/user/{user_id}/all")
 def get_user_groups(user_id: int, db: Session = Depends(get_db)):
-    """Alle Gruppen eines Users – für Mehrgruppen-Support."""
     memberships = (
         db.query(GroupMember, Group)
         .join(Group, GroupMember.group_id == Group.id)
