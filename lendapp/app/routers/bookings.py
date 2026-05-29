@@ -215,13 +215,14 @@ def update_status(booking_id: int, data: BookingStatusUpdate, user_id: int, db: 
 
     if borrower:
         if data.status == BookingStatus.approved:
+            date_to_str = fmt_date(booking.date_to) if booking.date_to else "kein Enddatum"
             mail_booking_approved(
                 borrower_email=borrower.email,
                 borrower_name=borrower.name,
                 item_name=item.name,
                 owner_name=owner.name if owner else "",
                 date_from=fmt_date(booking.date_from),
-                date_to=fmt_date(booking.date_to),
+                date_to=date_to_str,
             )
         elif data.status == BookingStatus.rejected:
             mail_booking_rejected(

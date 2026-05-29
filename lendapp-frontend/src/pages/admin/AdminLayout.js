@@ -25,7 +25,7 @@ export default function AdminLayout({ children }) {
   ];
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "var(--bg)" }}>
+    <div style={{ display: "flex", minHeight: "80vh", background: "var(--bg)" }}>
       {/* Admin Sidebar */}
       <div style={{ width: 200, minWidth: 200, background: "#1C1A16", display: "flex", flexDirection: "column", padding: "24px 14px", flexShrink: 0, position: "sticky", top: 0, height: "100vh" }}>
         <div style={{ color: "#fff", fontWeight: 700, fontSize: 16, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
