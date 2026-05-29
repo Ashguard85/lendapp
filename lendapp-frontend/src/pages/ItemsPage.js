@@ -147,7 +147,7 @@ function BookingModal({ item, userId, onClose, onBooked, bookings }) {
 
   const earliest = getEarliestFrom();
   const minFrom = toStr(earliest);
-  const [selected, setSelected] = useState({ from: minFrom, to: "" });
+  const [selected, setSelected] = useState({ from: "", to: "" });
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
