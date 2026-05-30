@@ -96,9 +96,18 @@ def reset_password(user_id: int, data: PasswordReset, db: Session = Depends(get_
     user = db.query(User).filter(User.id == user_id, User.deleted_at == None).first()
     if not user:
         raise HTTPException(404, "User nicht gefunden")
-    user.password = hash_password(data.new_password)
+    pw = data.new_password
+    if len(pw) < 8:
+        raise HTTPException(400, "Passwort muss mindestens 8 Zeichen haben")
+    if not any(c.isupper() for c in pw):
+        raise HTTPException(400, "Passwort muss mindestens einen Grossbuchstaben enthalten")
+    if not any(c.islower() for c in pw):
+        raise HTTPException(400, "Passwort muss mindestens einen Kleinbuchstaben enthalten")
+    if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in pw):
+        raise HTTPException(400, "Passwort muss mindestens ein Sonderzeichen enthalten")
+    user.password = hash_password(pw)
     db.commit()
-    return {"message": "Passwort zurückgesetzt"}
+    return {"message": "Passwort zurueckgesetzt"}
 
 
 @router.delete("/users/{user_id}", status_code=204)

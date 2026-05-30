@@ -51,8 +51,22 @@ export default function AuthPage() {
           </div>
           <div className="form-group">
             <label className="form-label">Passwort</label>
-            <input className="form-input" type="password" placeholder="..." value={form.password}
+            <input className="form-input" type="password" placeholder="Min. 8 Zeichen..." value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
+            {mode === "register" && form.password && (
+              <div style={{ fontSize: 11, marginTop: 4, color: "var(--text3)" }}>
+                {[
+                  [form.password.length >= 8,          "8+ Zeichen"],
+                  [/[A-Z]/.test(form.password),         "Grossbuchstabe"],
+                  [/[a-z]/.test(form.password),         "Kleinbuchstabe"],
+                  [/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(form.password), "Sonderzeichen"],
+                ].map(([ok, label]) => (
+                  <span key={label} style={{ marginRight: 8, color: ok ? "var(--accent)" : "var(--warn)" }}>
+                    {ok ? "✓" : "✗"} {label}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           {error && (
             <div style={{ fontSize: 13, color: error.startsWith("Konto") ? "var(--accent)" : "var(--warn)", marginBottom: 14, padding: "8px 12px", background: error.startsWith("Konto") ? "var(--accent-light)" : "var(--warn-light)", borderRadius: "var(--radius-sm)" }}>

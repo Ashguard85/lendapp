@@ -18,8 +18,16 @@ class LoginRequest(BaseModel):
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
     check_rate_limit(request, "register")
-    if len(data.password) < 8:
+    # Passwort-Staerke pruefen
+    pw = data.password
+    if len(pw) < 8:
         raise HTTPException(400, "Passwort muss mindestens 8 Zeichen haben")
+    if not any(c.isupper() for c in pw):
+        raise HTTPException(400, "Passwort muss mindestens einen Grossbuchstaben enthalten")
+    if not any(c.islower() for c in pw):
+        raise HTTPException(400, "Passwort muss mindestens einen Kleinbuchstaben enthalten")
+    if not any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in pw):
+        raise HTTPException(400, "Passwort muss mindestens ein Sonderzeichen enthalten (!@#$%^&*...)")
     if db.query(User).filter(User.email == data.email, User.deleted_at == None).first():
         raise HTTPException(400, "E-Mail bereits registriert")
     is_first_user = db.query(User).filter(User.deleted_at == None).count() == 0
