@@ -450,7 +450,13 @@ export default function ItemsPage() {
     if (!groups.length) return setLoading(false);
     Promise.all(
       groups.map(g => api.getItems(g.id, user.user_id).then(its => its.map(i => ({ ...i, _groupName: g.name, _groupId: g.id }))))
-    ).then(all => setItems(all.reduce((a, b) => a.concat(b), []))).catch(() => {}).finally(() => setLoading(false));
+    ).then(all => {
+      const flat = all.reduce((a, b) => a.concat(b), []);
+      // Deduplizieren nach item.id - Map nimmt ersten Treffer
+      const map = new Map();
+      flat.forEach(i => { if (!map.has(i.id)) map.set(i.id, i); });
+      setItems(Array.from(map.values()));
+    }).catch(() => {}).finally(() => setLoading(false));
   }
 
   useEffect(load, [groups.map(g => g.id).join(","), user.user_id]);

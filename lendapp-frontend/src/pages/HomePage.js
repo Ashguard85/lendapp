@@ -23,8 +23,13 @@ export default function HomePage() {
       Promise.all(groupIds.map(gid =>
         api.getItems(gid, user.user_id).then(its =>
           its.map(i => ({ ...i, _groupName: (groups.find(g => g.id === gid) || {}).name }))
-        )
-      )).then(all => all.reduce((a, b) => a.concat(b), [])),
+        ).catch(() => [])
+      )).then(all => {
+        const flat = all.reduce((a, b) => a.concat(b), []);
+        const map = new Map();
+        flat.forEach(i => { if (!map.has(i.id)) map.set(i.id, i); });
+        return Array.from(map.values());
+      }),
       api.getPendingForOwner(user.user_id),
       api.getBookingsForUser(user.user_id),
     ]).then(([its, pnd, bks]) => {
