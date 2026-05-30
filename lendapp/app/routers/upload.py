@@ -59,7 +59,8 @@ async def upload_image(
 
 
 @router.get("/{filename}")
-def get_image(filename: str, current_user: User = Depends(get_current_user)):
+def get_image(filename: str):
+    # Kein Auth noetig - Dateinamen sind UUIDs (nicht erratbar)
     filename = os.path.basename(filename)
     if not filename.endswith(".jpg"):
         raise HTTPException(400, "Ungueltige Datei")
@@ -70,7 +71,8 @@ def get_image(filename: str, current_user: User = Depends(get_current_user)):
 
 
 @router.get("/thumb/{filename}")
-def get_thumb(filename: str, current_user: User = Depends(get_current_user)):
+def get_thumb(filename: str):
+    # Kein Auth noetig - Dateinamen sind UUIDs (nicht erratbar)
     filename = os.path.basename(filename)
     if not filename.endswith(".jpg"):
         raise HTTPException(400, "Ungueltige Datei")
