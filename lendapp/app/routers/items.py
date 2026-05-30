@@ -5,6 +5,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.models.models import Item, GroupMember, User
 from app.schemas.schemas import ItemCreate, ItemUpdate, ItemOut
+from app.dependencies import get_current_user
 
 router = APIRouter()
 
@@ -15,10 +16,11 @@ def _check_member(db, group_id, user_id):
 
 
 @router.post("/", response_model=ItemOut, status_code=201)
-def create_item(data: ItemCreate, user_id: int, db: Session = Depends(get_db)):
-    # Sicherstellen dass user_id in der angegebenen Gruppe ist
-    _check_member(db, data.group_id, user_id)
-    item = Item(**data.model_dump(), owner_id=user_id)
+def create_item(data: ItemCreate, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
+    if data.group_id:
+        _check_member(db, data.group_id, current_user.id)
+    item = Item(**data.model_dump(), owner_id=current_user.id)
     db.add(item)
     db.commit()
     db.refresh(item)
@@ -28,15 +30,12 @@ def create_item(data: ItemCreate, user_id: int, db: Session = Depends(get_db)):
 @router.get("/group/{group_id}", response_model=List[ItemOut])
 def list_items(
     group_id: int,
-    user_id: int,
     category: Optional[str] = None,
     available_only: bool = False,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    # Pruefen ob User Mitglied ist
-    _check_member(db, group_id, user_id)
-
-    # Alle Mitglieder der Gruppe holen (nur aktive, nicht geloeschte User)
+    _check_member(db, group_id, current_user.id)
     members = (
         db.query(GroupMember)
         .join(User, GroupMember.user_id == User.id)
@@ -47,12 +46,7 @@ def list_items(
         ).all()
     )
     member_ids = [m.user_id for m in members]
-
-    # Items aller Mitglieder zeigen - nicht nach group_id filtern
-    q = db.query(Item).filter(
-        Item.owner_id.in_(member_ids),
-        Item.deleted_at == None,
-    )
+    q = db.query(Item).filter(Item.owner_id.in_(member_ids), Item.deleted_at == None)
     if category:
         q = q.filter(Item.category == category)
     if available_only:
@@ -61,7 +55,8 @@ def list_items(
 
 
 @router.get("/{item_id}", response_model=ItemOut)
-def get_item(item_id: int, db: Session = Depends(get_db)):
+def get_item(item_id: int, db: Session = Depends(get_db),
+             current_user: User = Depends(get_current_user)):
     item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
@@ -69,11 +64,12 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{item_id}", response_model=ItemOut)
-def update_item(item_id: int, data: ItemUpdate, user_id: int, db: Session = Depends(get_db)):
+def update_item(item_id: int, data: ItemUpdate, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
     item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
-    if item.owner_id != user_id:
+    if item.owner_id != current_user.id:
         raise HTTPException(403, "Nur der Besitzer darf bearbeiten")
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
@@ -83,11 +79,12 @@ def update_item(item_id: int, data: ItemUpdate, user_id: int, db: Session = Depe
 
 
 @router.delete("/{item_id}", status_code=204)
-def delete_item(item_id: int, user_id: int, db: Session = Depends(get_db)):
+def delete_item(item_id: int, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
     item = db.query(Item).filter(Item.id == item_id, Item.deleted_at == None).first()
     if not item:
         raise HTTPException(404, "Gegenstand nicht gefunden")
-    if item.owner_id != user_id:
+    if item.owner_id != current_user.id:
         raise HTTPException(403, "Nur der Besitzer darf loeschen")
     item.deleted_at = func.now()
     item.is_available = False

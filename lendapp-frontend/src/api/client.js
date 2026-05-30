@@ -20,43 +20,50 @@ async function req(method, path, body, userId) {
   return res.json();
 }
 
-// Auth
+// Auth (kein user_id Header noetig)
 export const register = (data) => req("POST", "/users/register", data);
 export const login = (email, password) => req("POST", "/users/login", { email, password });
 
-// Groups
-export const createGroup = (data, uid) => req("POST", `/groups/?user_id=${uid}`, data, uid);
-export const getGroup = (id) => req("GET", `/groups/${id}`);
-export const joinGroup = (code, uid) => req("POST", `/groups/join?invite_code=${code}&user_id=${uid}`, {}, uid);
-export const leaveGroup = (id, uid) => req("DELETE", `/groups/${id}/leave?user_id=${uid}`, undefined, uid);
-export const getMembers = (id) => req("GET", `/groups/${id}/members`);
+// Groups – user_id nur noch als Header
+export const createGroup = (data, uid) => req("POST", "/groups/", data, uid);
+export const getGroup = (id, uid) => req("GET", `/groups/${id}`, undefined, uid);
+export const joinGroup = (code, uid) => req("POST", `/groups/join?invite_code=${code}`, {}, uid);
+export const leaveGroup = (id, uid) => req("DELETE", `/groups/${id}/leave`, undefined, uid);
+export const getMembers = (id, uid) => req("GET", `/groups/${id}/members`, undefined, uid);
 
-// Items
-export const createItem = (data, uid) => req("POST", `/items/?user_id=${uid}`, data, uid);
-export const getItems = (groupId, uid) => req("GET", `/items/group/${groupId}?user_id=${uid}`, undefined, uid);
-export const getItem = (id) => req("GET", `/items/${id}`);
-export const updateItem = (id, data, uid) => req("PATCH", `/items/${id}?user_id=${uid}`, data, uid);
-export const deleteItem = (id, uid) => req("DELETE", `/items/${id}?user_id=${uid}`, undefined, uid);
+// Items – user_id nur noch als Header
+export const createItem = (data, uid) => req("POST", "/items/", data, uid);
+export const getItems = (groupId, uid) => req("GET", `/items/group/${groupId}`, undefined, uid);
+export const getItem = (id, uid) => req("GET", `/items/${id}`, undefined, uid);
+export const updateItem = (id, data, uid) => req("PATCH", `/items/${id}`, data, uid);
+export const deleteItem = (id, uid) => req("DELETE", `/items/${id}`, undefined, uid);
 
-// Bookings
-export const requestBooking = (data, uid) => req("POST", `/bookings/?user_id=${uid}`, data, uid);
-export const getBookingsForItem = (itemId) => req("GET", `/bookings/item/${itemId}`);
+// Bookings – user_id nur noch als Header
+export const requestBooking = (data, uid) => req("POST", "/bookings/", data, uid);
+export const getBookingsForItem = (itemId, uid) => req("GET", `/bookings/item/${itemId}`, undefined, uid);
 export const getBookingsForUser = (uid) => req("GET", `/bookings/user/${uid}`, undefined, uid);
 export const getPendingForOwner = (uid) => req("GET", `/bookings/pending/owner/${uid}`, undefined, uid);
 export const updateBookingStatus = (id, status, uid) =>
-  req("PATCH", `/bookings/${id}/status?user_id=${uid}`, { status }, uid);
+  req("PATCH", `/bookings/${id}/status`, { status }, uid);
 
-// Upload
-export async function uploadImage(file) {
+// Upload – user_id als Header
+export async function uploadImage(file, uid) {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${BASE}/upload/`, { method: "POST", body: formData });
+  const res = await fetch(`${BASE}/upload/`, {
+    method: "POST",
+    body: formData,
+    headers: { "X-User-Id": String(uid) },
+  });
   if (!res.ok) throw new Error("Upload fehlgeschlagen");
   return res.json();
 }
-export const deleteImage = (filename) => {
+export const deleteImage = (filename, uid) => {
   const name = filename.split("/").pop();
-  return fetch(`${BASE}/upload/${name}`, { method: "DELETE" });
+  return fetch(`${BASE}/upload/${name}`, {
+    method: "DELETE",
+    headers: { "X-User-Id": String(uid) },
+  });
 };
 
 // Admin

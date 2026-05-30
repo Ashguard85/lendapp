@@ -1,16 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from app.database import get_db
 from app.models.models import User, GroupMember, Group
 from app.schemas.schemas import UserCreate, UserOut
 from app.auth import hash_password, verify_password
+from app.dependencies import check_rate_limit
 
 router = APIRouter()
 
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
 @router.post("/register", response_model=UserOut, status_code=201)
-def register(data: UserCreate, db: Session = Depends(get_db)):
+def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(request, "register")
+    if len(data.password) < 8:
+        raise HTTPException(400, "Passwort muss mindestens 8 Zeichen haben")
     if db.query(User).filter(User.email == data.email, User.deleted_at == None).first():
         raise HTTPException(400, "E-Mail bereits registriert")
     is_first_user = db.query(User).filter(User.deleted_at == None).count() == 0
@@ -26,17 +35,14 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     return user
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-
 @router.post("/login")
-def login(data: LoginRequest, db: Session = Depends(get_db)):
+def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(request, "login")
     user = db.query(User).filter(
         User.email == data.email,
         User.deleted_at == None,
     ).first()
+    # Gleiche Fehlermeldung ob User nicht existiert oder Passwort falsch (kein User-Enumeration)
     if not user or not verify_password(data.password, user.password):
         raise HTTPException(401, "Ungueltige Anmeldedaten")
     if not user.is_active:

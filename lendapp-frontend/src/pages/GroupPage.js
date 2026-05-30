@@ -18,8 +18,8 @@ export default function GroupPage() {
     if (groupDetails[groupId] && members[groupId]) return;
     try {
       const [g, m] = await Promise.all([
-        api.getGroup(groupId),
-        api.getMembers(groupId),
+        api.getGroup(groupId, user.user_id),
+        api.getMembers(groupId, user.user_id),
       ]);
       setGroupDetails(prev => ({ ...prev, [groupId]: g }));
       setMembers(prev => ({ ...prev, [groupId]: m }));

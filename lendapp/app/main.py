@@ -39,11 +39,16 @@ app = FastAPI(
     openapi_url=None,
 )
 
+import os as _os
+_APP_URL = _os.getenv("APP_URL", "https://lendapp.haasenheim.com")
+_ALLOWED_ORIGINS = [_APP_URL, "http://localhost:3000", "http://localhost:3100"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-User-Id"],
 )
 
 app.include_router(users.router,    prefix="/users",    tags=["Users"])

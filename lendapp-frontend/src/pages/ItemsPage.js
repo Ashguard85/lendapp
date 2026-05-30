@@ -26,7 +26,7 @@ function ImageField({ currentUrl, onUploaded, onDeleted }) {
     if (!file) return;
     setUploading(true);
     try {
-      const result = await api.uploadImage(file);
+      const result = await api.uploadImage(file, userId);
       setPreview(result.url);
       onUploaded(result);
     } catch (err) { alert("Upload fehlgeschlagen"); }
@@ -34,7 +34,7 @@ function ImageField({ currentUrl, onUploaded, onDeleted }) {
   }
 
   async function handleDelete() {
-    if (currentUrl) await api.deleteImage(currentUrl);
+    if (currentUrl) await api.deleteImage(currentUrl, userId);
     setPreview(null);
     onDeleted();
   }
@@ -310,8 +310,8 @@ export function ItemDetailPage() {
   const [showExternal, setShowExternal] = useState(false);
 
   function load() {
-    api.getItem(id).then(setItem).catch(() => {});
-    api.getBookingsForItem(id).then(setBookings).catch(() => {});
+    api.getItem(id, user.user_id).then(setItem).catch(() => {});
+    api.getBookingsForItem(id, user.user_id).then(setBookings).catch(() => {});
   }
   useEffect(load, [id]);
 
@@ -327,7 +327,7 @@ export function ItemDetailPage() {
 
   async function handleDelete() {
     if (!window.confirm(item.name + " wirklich loschen?")) return;
-    if (item.image_url) await api.deleteImage(item.image_url);
+    if (item.image_url) await api.deleteImage(item.image_url, user.user_id);
     await api.deleteItem(item.id, user.user_id);
     navigate("/items");
   }

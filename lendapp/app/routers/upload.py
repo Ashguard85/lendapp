@@ -1,8 +1,11 @@
 import os
 import uuid
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.responses import FileResponse
 from PIL import Image
+from app.dependencies import get_current_user, check_rate_limit
+from app.models.models import User
+from fastapi import Request
 import io
 
 router = APIRouter()
@@ -17,7 +20,12 @@ MAX_SIZE      = 5 * 1024 * 1024
 
 
 @router.post("/")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    check_rate_limit(request, "upload")
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(400, "Nur JPG, PNG oder WebP erlaubt")
     contents = await file.read()
@@ -26,13 +34,13 @@ async def upload_image(file: UploadFile = File(...)):
 
     name = uuid.uuid4().hex
 
-    # Vollbild (max 800px)
+    # Vollbild (max 800px) – Pillow re-encodiert, entfernt Schadcode in Metadaten
     img = Image.open(io.BytesIO(contents))
     img.thumbnail((800, 800))
     full_path = os.path.join(UPLOAD_DIR, f"{name}.jpg")
     img.convert("RGB").save(full_path, "JPEG", quality=85)
 
-    # Thumbnail (200x200 crop)
+    # Thumbnail 200x200
     thumb = Image.open(io.BytesIO(contents))
     thumb.thumbnail((400, 400))
     w, h = thumb.size
@@ -51,8 +59,10 @@ async def upload_image(file: UploadFile = File(...)):
 
 
 @router.get("/{filename}")
-def get_image(filename: str):
+def get_image(filename: str, current_user: User = Depends(get_current_user)):
     filename = os.path.basename(filename)
+    if not filename.endswith(".jpg"):
+        raise HTTPException(400, "Ungueltige Datei")
     filepath = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "Bild nicht gefunden")
@@ -60,11 +70,12 @@ def get_image(filename: str):
 
 
 @router.get("/thumb/{filename}")
-def get_thumb(filename: str):
+def get_thumb(filename: str, current_user: User = Depends(get_current_user)):
     filename = os.path.basename(filename)
+    if not filename.endswith(".jpg"):
+        raise HTTPException(400, "Ungueltige Datei")
     filepath = os.path.join(THUMB_DIR, filename)
     if not os.path.exists(filepath):
-        # Fallback auf Vollbild
         filepath = os.path.join(UPLOAD_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(404, "Thumbnail nicht gefunden")
@@ -72,9 +83,10 @@ def get_thumb(filename: str):
 
 
 @router.delete("/{filename}", status_code=204)
-def delete_image(filename: str):
-    """Löscht Bild und Thumbnail vom Server."""
+def delete_image(filename: str, current_user: User = Depends(get_current_user)):
     filename = os.path.basename(filename)
+    if not filename.endswith(".jpg"):
+        raise HTTPException(400, "Ungueltige Datei")
     for directory in [UPLOAD_DIR, THUMB_DIR]:
         path = os.path.join(directory, filename)
         if os.path.exists(path):
