@@ -22,7 +22,7 @@ export default function BookingsPage() {
       const map = {};
       await Promise.all(bks.map(async b => {
         if (!map[b.item_id]) {
-          try { map[b.item_id] = await api.getItem(b.item_id, uid); } catch (e) {}
+          try { map[b.item_id] = await api.getItem(b.item_id, user.user_id); } catch (e) {}
         }
       }));
       setItems(map);

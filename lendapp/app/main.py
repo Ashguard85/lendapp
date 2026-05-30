@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
@@ -8,6 +8,7 @@ from app.database import engine, Base, get_db
 from app.models.models import User
 from app.auth import verify_password
 from app.routers import users, groups, items, bookings, upload, admin, ai
+from app.dependencies import check_docs_rate_limit
 
 Base.metadata.create_all(bind=engine)
 
@@ -66,10 +67,10 @@ def root():
 
 
 @app.get("/openapi.json", include_in_schema=False)
-def openapi(credentials: HTTPBasicCredentials = Depends(verify_docs)):
+def openapi(request: Request, credentials: HTTPBasicCredentials = Depends(verify_docs), _: None = Depends(check_docs_rate_limit)):
     return get_openapi(title=app.title, version=app.version, routes=app.routes)
 
 
 @app.get("/docs", include_in_schema=False)
-def docs(credentials: HTTPBasicCredentials = Depends(verify_docs)):
+def docs(request: Request, credentials: HTTPBasicCredentials = Depends(verify_docs), _: None = Depends(check_docs_rate_limit)):
     return get_swagger_ui_html(openapi_url="/api/openapi.json", title="LendApp API Docs")

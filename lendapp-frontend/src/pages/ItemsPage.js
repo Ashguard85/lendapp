@@ -16,7 +16,7 @@ function fmt(date) {
 const STATUS_LABEL = { pending: "ausstehend", approved: "genehmigt", rejected: "abgelehnt", returned: "zuruckgegeben", external: "extern" };
 const STATUS_BADGE = { pending: "badge-orange", approved: "badge-green", rejected: "badge-gray", returned: "badge-blue", external: "badge-orange" };
 
-function ImageField({ currentUrl, onUploaded, onDeleted }) {
+function ImageField({ currentUrl, onUploaded, onDeleted, userId }) {
   const [preview, setPreview] = useState(currentUrl || null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef();
@@ -103,7 +103,7 @@ function ItemModal({ item, onClose, onSaved, groupId, groupIds, userId }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-title">{isEdit ? "Bearbeiten" : "Gegenstand erfassen"}</div>
-        <ImageField currentUrl={imageUrl}
+        <ImageField currentUrl={imageUrl} userId={userId}
           onUploaded={r => { setImageUrl(r.url); setThumbUrl(r.thumb_url); }}
           onDeleted={() => { setImageUrl(null); setThumbUrl(null); }} />
         <div className="form-group"><label className="form-label">Name</label>

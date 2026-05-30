@@ -12,6 +12,15 @@ async function req(method, path, body, userId) {
     options.body = JSON.stringify(body);
   }
   const res = await fetch(`${BASE}${path}`, options);
+
+  // Bei 401: localStorage leeren und Seite neu laden – DB wurde resettet
+  if (res.status === 401) {
+    localStorage.removeItem("lendapp_user");
+    localStorage.removeItem("lendapp_groups");
+    window.location.href = "/";
+    throw new Error("Sitzung abgelaufen – bitte neu einloggen");
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || "Fehler");
@@ -20,25 +29,25 @@ async function req(method, path, body, userId) {
   return res.json();
 }
 
-// Auth (kein user_id Header noetig)
+// Auth
 export const register = (data) => req("POST", "/users/register", data);
 export const login = (email, password) => req("POST", "/users/login", { email, password });
 
-// Groups – user_id nur noch als Header
+// Groups
 export const createGroup = (data, uid) => req("POST", "/groups/", data, uid);
 export const getGroup = (id, uid) => req("GET", `/groups/${id}`, undefined, uid);
 export const joinGroup = (code, uid) => req("POST", `/groups/join?invite_code=${code}`, {}, uid);
 export const leaveGroup = (id, uid) => req("DELETE", `/groups/${id}/leave`, undefined, uid);
 export const getMembers = (id, uid) => req("GET", `/groups/${id}/members`, undefined, uid);
 
-// Items – user_id nur noch als Header
+// Items
 export const createItem = (data, uid) => req("POST", "/items/", data, uid);
 export const getItems = (groupId, uid) => req("GET", `/items/group/${groupId}`, undefined, uid);
 export const getItem = (id, uid) => req("GET", `/items/${id}`, undefined, uid);
 export const updateItem = (id, data, uid) => req("PATCH", `/items/${id}`, data, uid);
 export const deleteItem = (id, uid) => req("DELETE", `/items/${id}`, undefined, uid);
 
-// Bookings – user_id nur noch als Header
+// Bookings
 export const requestBooking = (data, uid) => req("POST", "/bookings/", data, uid);
 export const getBookingsForItem = (itemId, uid) => req("GET", `/bookings/item/${itemId}`, undefined, uid);
 export const getBookingsForUser = (uid) => req("GET", `/bookings/user/${uid}`, undefined, uid);
@@ -46,7 +55,7 @@ export const getPendingForOwner = (uid) => req("GET", `/bookings/pending/owner/$
 export const updateBookingStatus = (id, status, uid) =>
   req("PATCH", `/bookings/${id}/status`, { status }, uid);
 
-// Upload – user_id als Header
+// Upload
 export async function uploadImage(file, uid) {
   const formData = new FormData();
   formData.append("file", file);
@@ -55,9 +64,16 @@ export async function uploadImage(file, uid) {
     body: formData,
     headers: { "X-User-Id": String(uid) },
   });
+  if (res.status === 401) {
+    localStorage.removeItem("lendapp_user");
+    localStorage.removeItem("lendapp_groups");
+    window.location.href = "/";
+    throw new Error("Sitzung abgelaufen");
+  }
   if (!res.ok) throw new Error("Upload fehlgeschlagen");
   return res.json();
 }
+
 export const deleteImage = (filename, uid) => {
   const name = filename.split("/").pop();
   return fetch(`${BASE}/upload/${name}`, {
